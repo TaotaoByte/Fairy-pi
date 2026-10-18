@@ -1,0 +1,45 @@
+{
+  "name": "Fairy-pi",
+  "version": "0.1.0",
+  "description": "Fairy 能力在 Pi 上的移植：契约层、适配层与可选功能模块",
+  "type": "module",
+  "private": true,
+  "license": "Apache-2.0",
+  "keywords": [
+    "pi-package"
+  ],
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "files": [
+    "index.ts",
+    "src/",
+    "assets/",
+    "skills/",
+    "NOTICE",
+    "LICENSE"
+  ],
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "test:contracts": "node --experimental-strip-types --test tests/contracts.test.ts",
+    "test:adapters": "node --experimental-strip-types --test tests/adapters.test.ts",
+    "test:balance": "node --experimental-strip-types --test tests/balance.test.ts",
+    "test:voice": "node --experimental-strip-types --test tests/voice.test.ts",
+    "test:persona": "node --experimental-strip-types --test tests/persona.test.ts",
+    "test:browser": "node --experimental-strip-types --test tests/browser.test.ts",
+    "test:entry": "node --experimental-strip-types --test tests/entry.test.ts"
+  },
+  "dependencies": {
+    "mdast-util-from-markdown": "^2.0.3",
+    "mdast-util-gfm": "^3.1.0",
+    "micromark-extension-gfm": "^3.0.0"
+  }
+}

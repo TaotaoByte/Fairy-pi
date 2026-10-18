@@ -1,0 +1,43 @@
+Fairy-pi
+Copyright 2026 Fairy-pi contributors
+
+本包是 Fairy-DSH 在 Pi（@earendil-works/pi-coding-agent）上的移植，包含对下列上游
+作品的改编与再分发。上游同样以 Apache License 2.0 授权（全文见本目录 LICENSE）。
+
+上游项目：Fairy-DSH
+来源：https://github.com/Chengzhibense/Fairy-DSH
+许可：Apache License 2.0
+
+被移植/再分发的内容：
+
+1. fairy-contracts/            → src/contracts/
+   契约常量、诊断日志 schema 与脱敏规则；移植为 TypeScript，值与字面量保持一致。
+
+2. balance-meter/              → src/features/balance/
+   费用估算公式与单价表、日账累加语义、余额查询的缓存/合并/超时语义；
+   密钥来源由上游的 .credentials.yaml 明文提取改为由宿主的凭据接口注入。
+
+3. fairy-voice/                → src/features/voice/
+   lib/index.js 的纯文本管线（罗马数字、数字/时间/缩写口语化、Markdown 转朗读文本、
+   句子切分）、lib/server/local-tts-proxy.js 的本地 TTS 请求语义、
+   lib/server/voice-brief-fallback.js 的语音简报语义与提示词；
+   上游基于 req/res 的 /fairy-voice/* 端点未移植（Pi 没有 HTTP 端点注册能力）。
+
+4. .agent-presets/fairy/       → assets/persona/ 与 src/features/persona/
+   人格语料（behavior/canon/personality/style 共 9 个 JSON，内容未改动）、
+   preset.yml、ASSET-BOUNDARIES.json，以及 agent.cordis.yml 中 persona 插件的 config.text
+   （逐字保留为 persona-prompt.ts 的 FAIRY_PERSONA_PROMPT）。
+   agent.cordis.yml 里的 DSH 插件编排部分仅作来源留档，不参与运行。
+
+5. browser-dock/               → src/features/browser/
+   proxy.cjs 的 MCP 代理参数、状态文件的读写与命令语义；HTTP 端点与
+   frame 代理未移植（改为 MCP 服务器注册与状态命令）。
+
+6. fairy-system/               → scripts/
+   离线校验的检查项与判定口径；DSH_* 环境变量改为包内参数。
+
+未再分发（上游公开仓库中不存在，故无法移植）：
+- .agent-presets/fairy/runtime/{index.js, fairy_core.py, safety-gate.js}
+
+本包不含 pi-fairy / pi-fairy-win 的任何内容；动画与桌面层由用户已安装的独立包提供，
+两者不共享代码。

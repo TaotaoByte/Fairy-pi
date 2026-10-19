@@ -4,17 +4,58 @@
  *
  * Speaks the pi RPC protocol (docs/rpc.md in the pi package) and renders it.
  * Records arrive as plain JSON objects; this file owns all UI state.
+ *
+ * Layout mirrors the Fairy-DSH client: a left sidebar with navigation and a
+ * balance card in its footer, and one page per feature. Extension commands are
+ * executed through the same `prompt` channel a user would use, and their
+ * `notify` output is captured into the panel that asked for it.
  */
 
 const api = window.fairyPi;
+const SVG_NS = 'http://www.w3.org/2000/svg';
 
 // ---------------------------------------------------------------------------
-// Small DOM helpers
+// DOM helpers
 // ---------------------------------------------------------------------------
 
 const $ = (id) => document.getElementById(id);
 
 const nodes = {
+  // shell
+  sidebar: $('sidebar'),
+  nav: $('nav'),
+  workspace: $('workspace'),
+  pages: $('pages'),
+  pageTitle: $('page-title'),
+  pageSub: $('page-sub'),
+  modelMenu: $('model-menu'),
+  brand: $('brand'),
+
+  // topbar
+  chipModel: $('chip-model'),
+  chipModelName: $('chip-model-name'),
+  chipCwd: $('chip-cwd'),
+  statTokens: $('stat-tokens'),
+  statCost: $('stat-cost'),
+  statContext: $('stat-context'),
+  btnVoice: $('btn-voice'),
+  btnAbort: $('btn-abort'),
+  btnNew: $('btn-new'),
+  btnWorkdir: $('btn-workdir'),
+  btnSend: $('btn-send'),
+  btnSendLabel: $('btn-send-label'),
+
+  // sidebar footer
+  btnNewSession: $('btn-new-session'),
+  btnTheme: $('btn-theme'),
+  btnGotoSettings: $('btn-goto-settings'),
+  balanceCard: $('balance-card'),
+  runState: $('run-state'),
+  sideBalance: $('side-balance'),
+  sideToday: $('side-today'),
+  sideCost: $('side-cost'),
+
+  // chat
   stage: $('stage'),
   fairyStage: $('fairy-stage'),
   fairyMount: $('fairy-mount'),
@@ -27,36 +68,155 @@ const nodes = {
   input: $('input'),
   composer: $('composer'),
   slashMenu: $('slash-menu'),
-  runState: $('run-state'),
   queue: $('queue'),
+
+  // balance page
+  btnBalanceRefresh: $('btn-balance-refresh'),
+  balBalance: $('bal-balance'),
+  balToday: $('bal-today'),
+  balCost: $('bal-cost'),
+  balLedger: $('bal-ledger'),
+  balanceSource: $('balance-source'),
+  sessTokens: $('sess-tokens'),
+  sessCost: $('sess-cost'),
+  sessContext: $('sess-context'),
+  sessMessages: $('sess-messages'),
+
+  // voice page
+  voiceEnabled: $('voice-enabled'),
+  voiceName: $('voice-name'),
+  voiceRate: $('voice-rate'),
+  voiceRateValue: $('voice-rate-value'),
+  btnVoiceTest: $('btn-voice-test'),
+  btnVoiceStatus: $('btn-voice-status'),
+  voiceService: $('voice-service'),
+
+  // persona page
+  btnPersonaRefresh: $('btn-persona-refresh'),
+  personaEnabled: $('persona-enabled'),
+  personaStatus: $('persona-status'),
+  personaCorpus: $('persona-corpus'),
+
+  // skills page
+  btnSkillsRefresh: $('btn-skills-refresh'),
+  skillsList: $('skills-list'),
+  extList: $('ext-list'),
+
+  // browser page
+  btnBrowserRefresh: $('btn-browser-refresh'),
+  browserStatus: $('browser-status'),
+  browserUrl: $('browser-url'),
+  browserState: $('browser-state'),
+
+  // settings page
+  setModel: $('set-model'),
+  btnSetModel: $('btn-set-model'),
+  setThinking: $('set-thinking'),
+  btnSetThinking: $('btn-set-thinking'),
+  setCwd: $('set-cwd'),
+  btnSetWorkdir: $('btn-set-workdir'),
+  setTheme: $('set-theme'),
+  setMascot: $('set-mascot'),
+  setMascotScale: $('set-mascot-scale'),
+  setMascotScaleValue: $('set-mascot-scale-value'),
+  setMascotSpeed: $('set-mascot-speed'),
+  infoSession: $('info-session'),
+  infoMessages: $('info-messages'),
+  infoPi: $('info-pi'),
+  infoElectron: $('info-electron'),
+  infoPaths: $('info-paths'),
+
+  // overlays
   toasts: $('toasts'),
   modalRoot: $('modal-root'),
-  chipModel: $('chip-model'),
-  chipCwd: $('chip-cwd'),
-  statTokens: $('stat-tokens'),
-  statCost: $('stat-cost'),
-  statContext: $('stat-context'),
-  btnVoice: $('btn-voice'),
-  btnAbort: $('btn-abort'),
-  btnNew: $('btn-new'),
-  btnWorkdir: $('btn-workdir'),
-  btnSend: $('btn-send'),
 };
+
+function icon(name) {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('class', 'ico');
+  svg.setAttribute('aria-hidden', 'true');
+  const use = document.createElementNS(SVG_NS, 'use');
+  use.setAttribute('href', `#${name}`);
+  svg.append(use);
+  return svg;
+}
+
+// ---------------------------------------------------------------------------
+// Persistent desktop preferences
+// ---------------------------------------------------------------------------
+
+const PREFS_KEY = 'fairy-pi.desktop.prefs';
+
+const DEFAULT_PREFS = {
+  theme: 'dark',
+  voice: false,
+  voiceName: '',
+  voiceRate: 1.02,
+  mascotVisible: true,
+  mascotScale: 1,
+  mascotSpeed: 1,
+};
+
+function loadPrefs() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
+    if (stored && typeof stored === 'object') return { ...DEFAULT_PREFS, ...stored };
+  } catch {
+    /* first run, or storage disabled */
+  }
+  return { ...DEFAULT_PREFS };
+}
+
+let prefs = loadPrefs();
+
+function savePrefs() {
+  try {
+    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+  } catch {
+    /* storage may be unavailable; the session still works */
+  }
+}
+
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
 
 const state = {
   running: false,
   ready: false,
-  voice: false,
+  page: 'chat',
   commands: [],
+  models: [],
+  thinkingLevels: [],
+  currentModel: null,
   sessionName: '',
+  sessionId: '',
+  messageCount: 0,
+  info: null,
   lastSpokenText: '',
   slashIndex: 0,
   slashMatches: [],
   statusEntries: new Map(),
   widgets: new Map(),
+  balance: null,
+  browser: null,
 };
 
 const pending = new Map();
+
+// While a panel runs an extension command, its `notify` output is captured
+// here instead of being raised as a toast.
+let capture = null;
+
+const NAV = [
+  { id: 'chat', label: '对话', icon: 'i-chat', sub: '与 pi 的会话' },
+  { id: 'balance', label: '余额', icon: 'i-wallet', sub: 'DeepSeek 余额与当日用量' },
+  { id: 'voice', label: '语音', icon: 'i-voice', sub: '朗读与本地语音服务' },
+  { id: 'persona', label: '人格', icon: 'i-persona', sub: 'Fairy 语域注入' },
+  { id: 'skills', label: '技能', icon: 'i-skills', sub: '技能与扩展命令' },
+  { id: 'browser', label: '浏览器坞', icon: 'i-browser', sub: 'MCP 浏览器观察与接管' },
+  { id: 'settings', label: '设置', icon: 'i-settings', sub: '模型、目录、外观' },
+];
 
 // ---------------------------------------------------------------------------
 // Text helpers
@@ -175,6 +335,104 @@ function command(record) {
   });
 }
 
+/**
+ * Run an extension command the way a user would (`/name args`) and collect the
+ * `notify` messages it emits. Used by the panels so余额/语音/人格/坞 do not
+ * require typing a command. Resolves after a short grace period past the
+ * command response, because pi does not guarantee notify ordering.
+ */
+function captureCommand(text, timeout = 20000) {
+  const id = `c-${crypto.randomUUID()}`;
+  return new Promise((resolve) => {
+    const messages = [];
+    let settled = false;
+    let grace = null;
+
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (grace) clearTimeout(grace);
+      if (capture && capture.id === id) capture = null;
+      resolve(messages);
+    };
+
+    const timer = setTimeout(finish, timeout);
+    capture = { id, messages };
+    pending.set(id, () => {
+      grace = setTimeout(finish, 600);
+    });
+
+    if (!api.send({ id, type: 'prompt', message: text })) {
+      pending.delete(id);
+      finish();
+    }
+  });
+}
+
+async function runPanelCommand(text, timeout) {
+  const messages = await captureCommand(text, timeout);
+  return messages.map((entry) => String(entry.message || '')).join('\n').trim();
+}
+
+// ---------------------------------------------------------------------------
+// Navigation
+// ---------------------------------------------------------------------------
+
+function buildNav() {
+  nodes.nav.replaceChildren();
+  for (const item of NAV) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'nav-item';
+    button.dataset.page = item.id;
+    button.append(icon(item.icon));
+    const label = document.createElement('span');
+    label.textContent = item.label;
+    button.append(label);
+    const badge = document.createElement('span');
+    badge.className = 'nav-badge';
+    badge.dataset.badge = item.id;
+    button.append(badge);
+    button.addEventListener('click', () => showPage(item.id));
+    nodes.nav.append(button);
+  }
+}
+
+const PAGE_ENTER = {
+  balance: () => refreshBalance(),
+  voice: () => refreshVoiceService(),
+  persona: () => refreshPersona(),
+  skills: () => renderSkills(),
+  browser: () => refreshBrowser(),
+  settings: () => refreshSettings(),
+};
+
+function showPage(id) {
+  const next = NAV.find((entry) => entry.id === id) ? id : 'chat';
+  state.page = next;
+  for (const section of nodes.pages.querySelectorAll('.page')) {
+    const active = section.dataset.page === next;
+    section.classList.toggle('active', active);
+    section.hidden = !active;
+  }
+  for (const button of nodes.nav.querySelectorAll('.nav-item')) {
+    if (button.dataset.page === next) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  }
+  const meta = NAV.find((entry) => entry.id === next);
+  nodes.pageTitle.textContent = meta ? meta.label : '对话';
+  nodes.pageSub.textContent = meta ? meta.sub : '';
+  if (next === 'chat') layoutHero();
+  const enter = PAGE_ENTER[next];
+  if (enter) Promise.resolve(enter()).catch((error) => reportFailure('页面加载失败', error && error.message));
+}
+
+function navBadge(id, text) {
+  const badge = nodes.nav.querySelector(`.nav-badge[data-badge="${id}"]`);
+  if (badge) badge.textContent = text || '';
+}
+
 // ---------------------------------------------------------------------------
 // Mascot
 // ---------------------------------------------------------------------------
@@ -190,8 +448,12 @@ function mountMascot() {
   nodes.fairyMount.replaceChildren(root);
 }
 
+function mascotRoot() {
+  return nodes.fairyMount.querySelector('[data-dsh-fairy-mascot-root="true"]');
+}
+
 function setMascotState(next) {
-  const root = nodes.fairyMount.querySelector('[data-dsh-fairy-mascot-root="true"]');
+  const root = mascotRoot();
   if (root) root.setAttribute('data-state', next);
 }
 
@@ -218,6 +480,34 @@ function dockMascot(docked) {
 function setCaption(text) {
   nodes.fairyCaption.textContent = text;
   nodes.fairyStage.classList.toggle('has-caption', Boolean(text) && !nodes.fairyStage.classList.contains('docked'));
+}
+
+function applyPrefs() {
+  document.documentElement.dataset.theme = prefs.theme;
+  document.documentElement.style.setProperty('--mascot-scale', String(prefs.mascotScale));
+  const root = mascotRoot();
+  if (root) root.style.setProperty('--dsh-fairy-steady-rate', String(prefs.mascotSpeed));
+  nodes.fairyStage.hidden = !prefs.mascotVisible;
+
+  const themeUse = nodes.btnTheme.querySelector('use');
+  if (themeUse) themeUse.setAttribute('href', prefs.theme === 'dark' ? '#i-sun' : '#i-moon');
+  nodes.btnTheme.title = prefs.theme === 'dark' ? '切换到浅色主题' : '切换到深色主题';
+
+  if (nodes.setTheme) nodes.setTheme.value = prefs.theme;
+  if (nodes.setMascot) nodes.setMascot.checked = prefs.mascotVisible;
+  if (nodes.setMascotScale) {
+    nodes.setMascotScale.value = String(prefs.mascotScale);
+    nodes.setMascotScaleValue.textContent = Number(prefs.mascotScale).toFixed(2);
+  }
+  if (nodes.setMascotSpeed) nodes.setMascotSpeed.value = String(prefs.mascotSpeed);
+  if (nodes.voiceEnabled) nodes.voiceEnabled.checked = prefs.voice;
+  if (nodes.voiceRate) {
+    nodes.voiceRate.value = String(prefs.voiceRate);
+    nodes.voiceRateValue.textContent = Number(prefs.voiceRate).toFixed(2);
+  }
+  nodes.btnVoice.setAttribute('aria-pressed', String(prefs.voice));
+
+  if (prefs.mascotVisible) layoutHero();
 }
 
 // ---------------------------------------------------------------------------
@@ -276,16 +566,7 @@ function renderStaticMessage(message) {
     const { body } = addBubble('assistant', 'Fairy');
     if (Array.isArray(message.content)) {
       for (const block of message.content) {
-        if (block && block.type === 'thinking') {
-          const details = document.createElement('details');
-          details.className = 'thinking';
-          const summary = document.createElement('summary');
-          summary.textContent = 'thinking';
-          const text = document.createElement('div');
-          text.textContent = blockText(block);
-          details.append(summary, text);
-          body.append(details);
-        }
+        if (block && block.type === 'thinking') body.append(thinkingBlock(blockText(block)));
       }
     }
     const holder = document.createElement('div');
@@ -297,6 +578,17 @@ function renderStaticMessage(message) {
     const { body } = addBubble('system', 'system');
     body.textContent = messageText(message) || JSON.stringify(message).slice(0, 400);
   }
+}
+
+function thinkingBlock(text) {
+  const details = document.createElement('details');
+  details.className = 'thinking';
+  const summary = document.createElement('summary');
+  summary.textContent = 'thinking';
+  const body = document.createElement('div');
+  body.textContent = text;
+  details.append(summary, body);
+  return details;
 }
 
 function renderTool(toolCallId, toolName, args) {
@@ -462,6 +754,10 @@ function openDialog({ title, message, field, options, multiline }) {
 async function handleExtensionUiRequest(record) {
   switch (record.method) {
     case 'notify':
+      if (capture) {
+        capture.messages.push({ type: record.notifyType || 'info', message: record.message || '' });
+        break;
+      }
       toast(record.message || '', record.notifyType === 'warning' || record.notifyType === 'error' ? record.notifyType : 'info');
       break;
     case 'setStatus':
@@ -510,12 +806,14 @@ async function handleExtensionUiRequest(record) {
 // Session events
 // ---------------------------------------------------------------------------
 
+const toolCards = new Map();
+
 function setRunning(next) {
   state.running = next;
   nodes.runState.textContent = next ? '运行中' : state.ready ? '空闲' : '未连接';
   nodes.runState.className = `run-state ${next ? 'busy' : state.ready ? 'ready' : ''}`.trim();
   nodes.btnAbort.disabled = !next;
-  nodes.btnSend.textContent = next ? '插入' : '发送';
+  nodes.btnSendLabel.textContent = next ? '插入' : '发送';
   if (!next) {
     setMascotState('normal');
     setCaption('Fairy 待机中');
@@ -548,14 +846,9 @@ function handleSessionEvent(record) {
       }
       if (event.type === 'thinking_start' || event.type === 'thinking_delta' || event.type === 'thinking_end') {
         if (live.mode !== 'thinking') {
-          const details = document.createElement('details');
-          details.className = 'thinking';
-          const summary = document.createElement('summary');
-          summary.textContent = 'thinking';
-          const text = document.createElement('div');
-          details.append(summary, text);
+          const details = thinkingBlock('');
           live.body.append(details);
-          live.thinking = text;
+          live.thinking = details.querySelector('div');
           live.mode = 'thinking';
           details.open = true;
         }
@@ -588,16 +881,7 @@ function handleSessionEvent(record) {
         live.body.append(holder);
         if (Array.isArray(message.content)) {
           for (const block of message.content) {
-            if (block && block.type === 'thinking') {
-              const details = document.createElement('details');
-              details.className = 'thinking';
-              const summary = document.createElement('summary');
-              summary.textContent = 'thinking';
-              const text = document.createElement('div');
-              text.textContent = blockText(block);
-              details.append(summary, text);
-              live.body.prepend(details);
-            }
+            if (block && block.type === 'thinking') live.body.prepend(thinkingBlock(blockText(block)));
           }
         }
         live = null;
@@ -665,24 +949,28 @@ function handleSessionEvent(record) {
   }
 }
 
-const toolCards = new Map();
-
 // ---------------------------------------------------------------------------
-// Header, stats, voice
+// Header, stats, models
 // ---------------------------------------------------------------------------
-
-let currentModel = null;
 
 function updateModelChip() {
-  const label = currentModel ? currentModel.name || currentModel.id : '—';
-  nodes.chipModel.textContent = state.sessionName ? `${label} · ${state.sessionName}` : label;
+  const model = state.currentModel;
+  const label = model ? model.name || model.id : '—';
+  const suffix = model && model.provider ? ` · ${model.provider}` : '';
+  nodes.chipModelName.textContent = state.sessionName ? `${label}${suffix} · ${state.sessionName}` : `${label}${suffix}`;
+  nodes.chipModel.title = model
+    ? `当前模型：${label}（${model.provider}/${model.id}）\n上下文 ${model.contextWindow || '—'} · ${model.reasoning ? '支持推理' : '不支持推理'}`
+    : '当前模型';
+  navBadge('chat', '');
 }
 
 async function refreshState() {
   const result = await command({ type: 'get_state' });
   if (result.success && result.data) {
-    currentModel = result.data.model || null;
+    state.currentModel = result.data.model || null;
     state.sessionName = result.data.sessionName || '';
+    state.sessionId = result.data.sessionId || '';
+    state.messageCount = result.data.messageCount || 0;
     updateModelChip();
     setRunning(Boolean(result.data.isStreaming));
   }
@@ -693,10 +981,19 @@ async function refreshStats() {
   if (!result.success || !result.data) return;
   const data = result.data;
   const tokens = data.tokens || {};
-  nodes.statTokens.textContent = `${(tokens.total || 0).toLocaleString('en-US')} tok`;
-  nodes.statCost.textContent = `$${(data.cost || 0).toFixed(4)}`;
-  const context = data.contextUsage;
-  nodes.statContext.textContent = context && context.percent != null ? `${Math.round(context.percent)}%` : '—';
+  const total = Number(tokens.total || 0);
+  const cost = Number(data.cost || 0);
+  const percent = data.contextUsage && data.contextUsage.percent != null ? Math.round(data.contextUsage.percent) : null;
+
+  nodes.statTokens.textContent = `${total.toLocaleString('en-US')} tok`;
+  nodes.statCost.textContent = `$${cost.toFixed(4)}`;
+  nodes.statContext.textContent = percent == null ? '—' : `${percent}%`;
+
+  nodes.sessTokens.textContent = total.toLocaleString('en-US');
+  nodes.sessCost.textContent = `$${cost.toFixed(4)}`;
+  nodes.sessContext.textContent = percent == null ? '—' : `${percent}%`;
+  nodes.sessMessages.textContent = String(state.messageCount || 0);
+  nodes.infoMessages.textContent = String(state.messageCount || 0);
 }
 
 async function loadCommands() {
@@ -713,6 +1010,7 @@ async function loadCommands() {
   }
   state.commands = [...seen.values()];
   renderEmptyHints();
+  renderSkills();
 }
 
 function renderEmptyHints() {
@@ -734,6 +1032,7 @@ function renderEmptyHints() {
     chip.title = entry.description || '';
     chip.addEventListener('click', () => {
       nodes.input.value = `/${entry.name}`;
+      showPage('chat');
       nodes.input.focus();
       updateSlashMenu();
     });
@@ -741,9 +1040,168 @@ function renderEmptyHints() {
   }
 }
 
+async function loadModels() {
+  const result = await command({ type: 'get_available_models' });
+  if (result.success && result.data) state.models = result.data.models || [];
+  const levels = await command({ type: 'get_available_thinking_levels' });
+  if (levels.success && levels.data) state.thinkingLevels = levels.data.levels || [];
+  fillModelSelect();
+  fillThinkingSelect();
+}
+
+function fillModelSelect() {
+  if (!nodes.setModel) return;
+  nodes.setModel.replaceChildren();
+  const groups = new Map();
+  for (const model of state.models) {
+    const key = model.provider || '其他';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(model);
+  }
+  for (const [provider, list] of groups) {
+    const group = document.createElement('optgroup');
+    group.label = provider;
+    for (const model of list) {
+      const option = document.createElement('option');
+      option.value = `${model.provider}/${model.id}`;
+      option.textContent = `${model.name || model.id}${model.reasoning ? ' · 推理' : ''}`;
+      group.append(option);
+    }
+    nodes.setModel.append(group);
+  }
+  if (state.currentModel) nodes.setModel.value = `${state.currentModel.provider}/${state.currentModel.id}`;
+}
+
+function fillThinkingSelect() {
+  if (!nodes.setThinking) return;
+  nodes.setThinking.replaceChildren();
+  for (const level of state.thinkingLevels) {
+    const option = document.createElement('option');
+    option.value = level;
+    option.textContent = level;
+    nodes.setThinking.append(option);
+  }
+}
+
+async function setModel(provider, modelId) {
+  const result = await command({ type: 'set_model', provider, modelId });
+  if (!result.success) {
+    toast(`切换模型失败：${result.error || '未知原因'}`, 'error');
+    return;
+  }
+  state.currentModel = result.data || state.currentModel;
+  updateModelChip();
+  fillModelSelect();
+  toast(`已切换到 ${state.currentModel.name || modelId}`, 'info');
+}
+
+async function applyThinkingLevel(level) {
+  const result = await command({ type: 'set_thinking_level', level });
+  if (!result.success) toast(`设置思考档位失败：${result.error || ''}`, 'error');
+  else toast(`思考档位：${level}`, 'info');
+}
+
+// -- model menu --------------------------------------------------------------
+
+function closeModelMenu() {
+  nodes.modelMenu.hidden = true;
+  nodes.chipModel.setAttribute('aria-expanded', 'false');
+}
+
+function openModelMenu() {
+  if (!state.models.length) {
+    toast('模型列表尚未就绪', 'warning');
+    return;
+  }
+  nodes.modelMenu.replaceChildren();
+  const groups = new Map();
+  for (const model of state.models) {
+    const key = model.provider || '其他';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(model);
+  }
+  for (const [provider, list] of groups) {
+    const group = document.createElement('div');
+    group.className = 'model-group';
+    const title = document.createElement('div');
+    title.className = 'model-group-title';
+    title.textContent = provider;
+    group.append(title);
+    for (const model of list) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'model-option';
+      button.setAttribute('role', 'menuitem');
+      const active = state.currentModel && state.currentModel.id === model.id && state.currentModel.provider === model.provider;
+      button.dataset.active = String(Boolean(active));
+      const name = document.createElement('span');
+      name.className = 'model-option-name';
+      name.textContent = model.name || model.id;
+      const desc = document.createElement('span');
+      desc.className = 'model-option-desc';
+      if (model.reasoning) {
+        const tag = document.createElement('span');
+        tag.className = 'model-tag';
+        tag.textContent = '推理';
+        desc.append(tag);
+      }
+      const ctx = document.createElement('span');
+      ctx.className = 'model-tag';
+      ctx.textContent = `${Math.round((model.contextWindow || 0) / 1000)}k`;
+      desc.append(ctx);
+      button.append(name, desc);
+      button.addEventListener('click', () => {
+        closeModelMenu();
+        setModel(model.provider, model.id);
+      });
+      group.append(button);
+    }
+    nodes.modelMenu.append(group);
+  }
+
+  const chipRect = nodes.chipModel.getBoundingClientRect();
+  const wsRect = nodes.workspace.getBoundingClientRect();
+  const width = nodes.modelMenu.offsetWidth || 340;
+  const left = Math.max(8, Math.min(chipRect.left - wsRect.left, wsRect.width - width - 12));
+  nodes.modelMenu.style.left = `${left}px`;
+  nodes.modelMenu.style.top = `${chipRect.bottom - wsRect.top + 6}px`;
+  nodes.modelMenu.hidden = false;
+  nodes.chipModel.setAttribute('aria-expanded', 'true');
+}
+
+// ---------------------------------------------------------------------------
+// Voice
+// ---------------------------------------------------------------------------
+
+function voiceList() {
+  return window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
+}
+
+function fillVoiceSelect() {
+  if (!nodes.voiceName) return;
+  const voices = voiceList();
+  nodes.voiceName.replaceChildren();
+  const auto = document.createElement('option');
+  auto.value = '';
+  auto.textContent = '自动（优先中文）';
+  nodes.voiceName.append(auto);
+  for (const voice of voices) {
+    const option = document.createElement('option');
+    option.value = voice.name;
+    option.textContent = `${voice.name} — ${voice.lang}`;
+    nodes.voiceName.append(option);
+  }
+  const has = voices.some((voice) => voice.name === prefs.voiceName);
+  nodes.voiceName.value = has ? prefs.voiceName : '';
+}
+
 function pickVoice() {
-  const voices = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
+  const voices = voiceList();
   if (!voices.length) return null;
+  if (prefs.voiceName) {
+    const exact = voices.find((voice) => voice.name === prefs.voiceName);
+    if (exact) return exact;
+  }
   return (
     voices.find((v) => /^zh[-_]CN/i.test(v.lang) && /Xiaoxiao|Yunxi|Microsoft/i.test(v.name)) ||
     voices.find((v) => /^zh/i.test(v.lang)) ||
@@ -760,16 +1218,260 @@ function speak(text) {
   const voice = pickVoice();
   if (voice) utterance.voice = voice;
   utterance.lang = voice ? voice.lang : 'zh-CN';
-  utterance.rate = 1.02;
+  utterance.rate = Number(prefs.voiceRate) || 1.02;
   utterance.pitch = 1.06;
   window.speechSynthesis.cancel();
   window.speechSynthesis.speak(utterance);
 }
 
 async function speakLatest() {
-  if (!state.voice) return;
+  if (!prefs.voice) return;
   const result = await command({ type: 'get_last_assistant_text' });
   if (result.success && result.data && result.data.text) speak(result.data.text);
+}
+
+async function refreshVoiceService() {
+  const text = await runPanelCommand('/fairy-voice status', 12000);
+  nodes.voiceService.textContent = text || '本地语音服务未返回信息。';
+  const ok = /正常|可用|available/i.test(text) && !/不可用|未启动/.test(text);
+  navBadge('voice', ok ? '在线' : '离线');
+}
+
+// ---------------------------------------------------------------------------
+// Balance
+// ---------------------------------------------------------------------------
+
+function parseBalance(text) {
+  const out = { source: '' };
+  for (const line of String(text || '').split('\n')) {
+    let match;
+    if ((match = line.match(/余额[：:]\s*(.+)/))) out.balance = match[1].trim();
+    else if ((match = line.match(/今日用量[：:]\s*(.+)/))) out.today = match[1].trim();
+    else if ((match = line.match(/费用估算[：:]\s*(.+)/))) {
+      out.cost = match[1].trim();
+      const paren = out.cost.match(/[（(]([^）)]+)[）)]/);
+      if (paren) out.source = paren[1].trim();
+      out.cost = out.cost.replace(/[（(][^）)]+[）)]/, '').trim();
+    } else if ((match = line.match(/Pi 记账[：:]\s*(.+)/))) out.ledger = match[1].trim();
+  }
+  return out;
+}
+
+function renderBalance() {
+  const data = state.balance;
+  const setAll = (targets, value) => targets.forEach((node) => { if (node) node.textContent = value; });
+  if (!data) {
+    setAll([nodes.balBalance, nodes.sideBalance], '—');
+    setAll([nodes.balToday, nodes.sideToday], '—');
+    setAll([nodes.balCost, nodes.sideCost], '—');
+    setAll([nodes.balLedger], '—');
+    return;
+  }
+  setAll([nodes.balBalance, nodes.sideBalance], data.balance || '—');
+  setAll([nodes.balToday, nodes.sideToday], data.today || '—');
+  setAll([nodes.balCost, nodes.sideCost], data.cost || '—');
+  setAll([nodes.balLedger], data.ledger || '—');
+  nodes.balanceSource.textContent = data.source
+    ? `计价源：${data.source}。数据由 /fairy-balance 向 DeepSeek 拉取，仅用于估算。`
+    : '数据由 /fairy-balance 向 DeepSeek 拉取，仅用于估算。';
+}
+
+async function refreshBalance() {
+  const text = await runPanelCommand('/fairy-balance', 25000);
+  if (!text) {
+    nodes.balanceSource.textContent = '未取到余额数据（本地服务或网络未就绪）。可稍后重试。';
+    return;
+  }
+  state.balance = parseBalance(text);
+  renderBalance();
+}
+
+// ---------------------------------------------------------------------------
+// Persona
+// ---------------------------------------------------------------------------
+
+function parseCorpus(text) {
+  const items = [];
+  let current = null;
+  for (const line of String(text || '').split('\n')) {
+    const bullet = line.match(/^-\s+([^（(]+)[（(]([^）)]+)[）)]：(.*)$/);
+    if (bullet) {
+      current = { name: bullet[1].trim(), meta: bullet[2].trim(), desc: bullet[3].trim(), path: '' };
+      items.push(current);
+      continue;
+    }
+    const path = line.match(/^\s{2,}(\S.*)$/);
+    if (path && current) current.path = path[1].trim();
+    else current = null;
+  }
+  return items;
+}
+
+function renderCorpus(items) {
+  nodes.personaCorpus.replaceChildren();
+  if (!items.length) {
+    const empty = document.createElement('p');
+    empty.className = 'panel-note';
+    empty.textContent = '未取到语料列表。';
+    nodes.personaCorpus.append(empty);
+    return;
+  }
+  for (const item of items) {
+    const row = document.createElement('div');
+    row.className = 'corpus-item';
+    const name = document.createElement('span');
+    name.className = 'skill-name';
+    name.textContent = item.name;
+    const desc = document.createElement('span');
+    desc.className = 'skill-desc';
+    desc.textContent = `${item.meta}：${item.desc}`;
+    row.append(name, desc);
+    if (item.path) row.title = item.path;
+    nodes.personaCorpus.append(row);
+  }
+}
+
+async function refreshPersona() {
+  const status = await runPanelCommand('/fairy-persona status', 12000);
+  nodes.personaStatus.textContent = status || '人格插件未返回信息。';
+  const enabled = /已开启|已启用|开启中/.test(status) && !/已关闭/.test(status);
+  nodes.personaEnabled.checked = enabled;
+  navBadge('persona', enabled ? '开' : '关');
+  const corpus = await runPanelCommand('/fairy-persona corpus', 12000);
+  renderCorpus(parseCorpus(corpus));
+}
+
+async function setPersona(enabled) {
+  await captureCommand(`/fairy-persona ${enabled ? 'on' : 'off'}`, 12000);
+  await refreshPersona();
+  toast(enabled ? '人设注入已开启（会话级）' : '人设注入已关闭', 'info');
+}
+
+// ---------------------------------------------------------------------------
+// Skills
+// ---------------------------------------------------------------------------
+
+function renderSkills() {
+  if (!nodes.skillsList) return;
+  const skills = state.commands.filter((entry) => entry.source === 'skill');
+  const extensions = state.commands.filter((entry) => entry.source !== 'skill');
+  const fill = (host, list, prefix) => {
+    host.replaceChildren();
+    if (!list.length) {
+      const empty = document.createElement('p');
+      empty.className = 'panel-note';
+      empty.textContent = '暂无。可点右上角刷新。';
+      host.append(empty);
+      return;
+    }
+    for (const entry of list) {
+      const row = document.createElement('div');
+      row.className = 'skill-item';
+      const name = document.createElement('span');
+      name.className = 'skill-name';
+      name.textContent = `${prefix}${entry.name}`;
+      const desc = document.createElement('span');
+      desc.className = 'skill-desc';
+      desc.textContent = entry.description || '';
+      const use = document.createElement('button');
+      use.type = 'button';
+      use.className = 'ghost';
+      use.textContent = '使用';
+      use.addEventListener('click', () => {
+        nodes.input.value = `${prefix}${entry.name} `;
+        showPage('chat');
+        autosize();
+        nodes.input.focus();
+      });
+      row.append(name, desc, use);
+      host.append(row);
+    }
+  };
+  fill(nodes.skillsList, skills, '/');
+  fill(nodes.extList, extensions, '/');
+  navBadge('skills', String(skills.length));
+}
+
+// ---------------------------------------------------------------------------
+// Browser dock
+// ---------------------------------------------------------------------------
+
+function renderBrowser() {
+  const data = state.browser;
+  if (!data) {
+    nodes.browserStatus.textContent = '未查询';
+    nodes.browserStatus.dataset.state = '';
+    nodes.browserUrl.textContent = '';
+    return;
+  }
+  const active = Boolean(data.active);
+  nodes.browserStatus.textContent = `${data.status || '未知'}${active ? ' · 已激活' : ''}`;
+  nodes.browserStatus.dataset.state = active ? 'active' : 'warning';
+  nodes.browserUrl.textContent = data.title || data.url || '';
+  nodes.browserState.textContent = JSON.stringify(data, null, 2);
+  navBadge('browser', active ? '活动' : '');
+}
+
+async function refreshBrowser() {
+  const text = await runPanelCommand('/fairy-browser state', 12000);
+  const json = text.match(/\{[\s\S]*\}/);
+  if (json) {
+    try {
+      state.browser = JSON.parse(json[0]);
+    } catch {
+      state.browser = { status: text.split('\n')[0] || '未知' };
+    }
+  } else {
+    state.browser = { status: text.split('\n')[0] || '未激活' };
+  }
+  renderBrowser();
+}
+
+async function browserCommand(action) {
+  const revision = state.browser && state.browser.frameRevision != null ? state.browser.frameRevision : 0;
+  const text = action === 'takeover' ? `/fairy-browser takeover ${revision}` : `/fairy-browser ${action}`;
+  const reply = await runPanelCommand(text, 12000);
+  if (reply) toast(reply.split('\n')[0], 'info');
+  await refreshBrowser();
+}
+
+// ---------------------------------------------------------------------------
+// Settings
+// ---------------------------------------------------------------------------
+
+async function refreshSettings() {
+  await loadModels();
+  if (state.currentModel) nodes.setModel.value = `${state.currentModel.provider}/${state.currentModel.id}`;
+  nodes.setThinking.value = state.thinkingLevels.includes('high') ? 'high' : nodes.setThinking.value;
+  const levels = await command({ type: 'get_available_thinking_levels' });
+  if (levels.success && levels.data && levels.data.levels) {
+    state.thinkingLevels = levels.data.levels;
+    fillThinkingSelect();
+  }
+  const stateResult = await command({ type: 'get_state' });
+  if (stateResult.success && stateResult.data) {
+    nodes.setThinking.value = stateResult.data.thinkingLevel || nodes.setThinking.value;
+  }
+  applyPrefs();
+  const info = state.info || {};
+  nodes.setCwd.textContent = (info.cwd || '—');
+  nodes.infoSession.textContent = state.sessionId || '—';
+  nodes.infoMessages.textContent = String(state.messageCount || 0);
+  nodes.infoPi.textContent = info.piVersion || '未找到';
+  nodes.infoElectron.textContent = info.electron || '—';
+  nodes.infoPaths.textContent = [
+    `工作目录：${info.cwd || '—'}`,
+    `pi 入口：${info.piPath || '未找到'}`,
+    `pi 版本：${info.piVersion || '未找到'}`,
+  ].join('\n');
+}
+
+async function chooseWorkdir() {
+  const picked = await api.pickWorkdir();
+  if (!picked) return;
+  await api.restart({ cwd: picked });
+  await afterStart();
+  toast(`工作目录已切到 ${picked}`, 'info');
 }
 
 // ---------------------------------------------------------------------------
@@ -898,22 +1600,21 @@ function handleStatus(status) {
   }
 }
 
-async function boot() {
-  mountMascot();
-  layoutHero();
-  window.addEventListener('resize', layoutHero);
+function bindShell() {
+  buildNav();
 
   nodes.btnVoice.addEventListener('click', () => {
-    state.voice = !state.voice;
-    nodes.btnVoice.setAttribute('aria-pressed', String(state.voice));
-    if (!state.voice && window.speechSynthesis) window.speechSynthesis.cancel();
-    toast(state.voice ? '语音朗读已开启' : '语音朗读已关闭', 'info');
-    if (state.voice) speakLatest();
+    prefs.voice = !prefs.voice;
+    savePrefs();
+    applyPrefs();
+    if (!prefs.voice && window.speechSynthesis) window.speechSynthesis.cancel();
+    toast(prefs.voice ? '语音朗读已开启' : '语音朗读已关闭', 'info');
+    if (prefs.voice) speakLatest();
   });
 
   nodes.btnAbort.addEventListener('click', () => command({ type: 'abort' }));
 
-  nodes.btnNew.addEventListener('click', async () => {
+  const newSession = async () => {
     const result = await command({ type: 'new_session' });
     if (result.success && !(result.data && result.data.cancelled)) {
       clearTranscript();
@@ -921,13 +1622,107 @@ async function boot() {
       refreshState();
       refreshStats();
     }
+  };
+  nodes.btnNew.addEventListener('click', newSession);
+  nodes.btnNewSession.addEventListener('click', () => {
+    showPage('chat');
+    newSession();
   });
 
-  nodes.btnWorkdir.addEventListener('click', async () => {
-    const picked = await api.pickWorkdir();
-    if (!picked) return;
-    await api.restart({ cwd: picked });
-    await afterStart();
+  nodes.btnWorkdir.addEventListener('click', chooseWorkdir);
+  nodes.btnSetWorkdir.addEventListener('click', chooseWorkdir);
+
+  nodes.btnTheme.addEventListener('click', () => {
+    prefs.theme = prefs.theme === 'dark' ? 'light' : 'dark';
+    savePrefs();
+    applyPrefs();
+  });
+
+  nodes.btnGotoSettings.addEventListener('click', () => showPage('settings'));
+  nodes.balanceCard.addEventListener('click', () => showPage('balance'));
+
+  nodes.chipModel.addEventListener('click', (event) => {
+    event.stopPropagation();
+    if (nodes.modelMenu.hidden) openModelMenu();
+    else closeModelMenu();
+  });
+  nodes.chipCwd.addEventListener('click', () => showPage('settings'));
+  document.addEventListener('click', (event) => {
+    if (nodes.modelMenu.hidden) return;
+    if (!nodes.modelMenu.contains(event.target) && !nodes.chipModel.contains(event.target)) closeModelMenu();
+  });
+
+  // balance page
+  nodes.btnBalanceRefresh.addEventListener('click', () => refreshBalance());
+
+  // voice page
+  nodes.voiceEnabled.addEventListener('change', () => {
+    prefs.voice = nodes.voiceEnabled.checked;
+    savePrefs();
+    applyPrefs();
+    if (prefs.voice) speakLatest();
+  });
+  nodes.voiceName.addEventListener('change', () => {
+    prefs.voiceName = nodes.voiceName.value;
+    savePrefs();
+  });
+  nodes.voiceRate.addEventListener('input', () => {
+    prefs.voiceRate = Number(nodes.voiceRate.value);
+    nodes.voiceRateValue.textContent = prefs.voiceRate.toFixed(2);
+    savePrefs();
+  });
+  nodes.btnVoiceTest.addEventListener('click', () => {
+    state.lastSpokenText = '';
+    speak('我是 Fairy，pi 的桌面端已就绪。');
+  });
+  nodes.btnVoiceStatus.addEventListener('click', () => refreshVoiceService());
+
+  // persona page
+  nodes.btnPersonaRefresh.addEventListener('click', () => refreshPersona());
+  nodes.personaEnabled.addEventListener('change', () => setPersona(nodes.personaEnabled.checked));
+
+  // skills page
+  nodes.btnSkillsRefresh.addEventListener('click', async () => {
+    await loadCommands();
+    renderSkills();
+  });
+
+  // browser page
+  nodes.btnBrowserRefresh.addEventListener('click', () => refreshBrowser());
+  for (const button of document.querySelectorAll('[data-browser-cmd]')) {
+    button.addEventListener('click', () => browserCommand(button.dataset.browserCmd));
+  }
+
+  // settings page
+  nodes.btnSetModel.addEventListener('click', () => {
+    const value = nodes.setModel.value;
+    if (!value) return;
+    const [provider, ...rest] = value.split('/');
+    setModel(provider, rest.join('/'));
+  });
+  nodes.btnSetThinking.addEventListener('click', () => {
+    if (nodes.setThinking.value) applyThinkingLevel(nodes.setThinking.value);
+  });
+  nodes.setTheme.addEventListener('change', () => {
+    prefs.theme = nodes.setTheme.value;
+    savePrefs();
+    applyPrefs();
+  });
+  nodes.setMascot.addEventListener('change', () => {
+    prefs.mascotVisible = nodes.setMascot.checked;
+    savePrefs();
+    applyPrefs();
+  });
+  nodes.setMascotScale.addEventListener('input', () => {
+    prefs.mascotScale = Number(nodes.setMascotScale.value);
+    nodes.setMascotScaleValue.textContent = prefs.mascotScale.toFixed(2);
+    savePrefs();
+    applyPrefs();
+  });
+  nodes.setMascotSpeed.addEventListener('change', () => {
+    prefs.mascotSpeed = Number(nodes.setMascotSpeed.value);
+    savePrefs();
+    applyPrefs();
   });
 
   nodes.composer.addEventListener('submit', (event) => {
@@ -963,8 +1758,28 @@ async function boot() {
   });
 
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && state.running) command({ type: 'abort' });
+    if (event.key === 'Escape') {
+      if (!nodes.modelMenu.hidden) {
+        closeModelMenu();
+        return;
+      }
+      if (state.running) command({ type: 'abort' });
+    }
   });
+
+  window.addEventListener('resize', () => {
+    layoutHero();
+    if (!nodes.modelMenu.hidden) closeModelMenu();
+  });
+}
+
+async function boot() {
+  applyPrefs();
+  mountMascot();
+  applyPrefs();
+  bindShell();
+  showPage('chat');
+  layoutHero();
 
   api.onRecord(handleRecord);
   api.onStatus(handleStatus);
@@ -983,6 +1798,7 @@ async function boot() {
   });
 
   const info = await api.bootstrap();
+  state.info = info;
   console.info(
     `[fairy-pi] desktop ${info && info.appVersion}; electron ${info && info.electron}; pi ${
       (info && info.piVersion) || '未找到'
@@ -1009,17 +1825,22 @@ async function afterStart() {
   await refreshState();
   await refreshStats();
   await loadCommands();
+  await loadModels();
+  fillVoiceSelect();
+  renderBalance();
   handleStatus({ state: 'ready' });
-}
-
-if (window.speechSynthesis) {
-  // Chromium populates the voice list asynchronously.
-  window.speechSynthesis.addEventListener('voiceschanged', () => {});
+  // The sidebar card mirrors DSH's one; fill it once at startup.
+  refreshBalance().catch(() => {});
 }
 
 function reportFailure(message, detail) {
   console.error(`[fairy-pi] ${message}`, detail === undefined ? '' : detail);
   toast(`${message}${detail ? `：${detail}` : ''}`, 'error');
+}
+
+if (window.speechSynthesis) {
+  // Chromium populates the voice list asynchronously.
+  window.speechSynthesis.addEventListener('voiceschanged', () => fillVoiceSelect());
 }
 
 window.addEventListener('error', (event) => {

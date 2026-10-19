@@ -67,6 +67,26 @@ check('renderer uses the mascot root attribute', app.includes('data-dsh-fairy-ma
 check('renderer speaks the rpc prompt command', app.includes("type: 'prompt'"));
 check('renderer handles extension ui requests', app.includes('extension_ui_request'));
 
+console.log('sidebar shell');
+const styles = readFileSync(path.join(root, 'src', 'renderer', 'styles.css'), 'utf8');
+const PAGES = ['chat', 'balance', 'voice', 'persona', 'skills', 'browser', 'settings'];
+for (const page of PAGES) {
+  check(`index.html defines the ${page} page`, html.includes(`data-page="${page}"`));
+  check(`renderer routes to the ${page} page`, app.includes(`id: '${page}'`) || app.includes(`${page}: () =>`));
+}
+for (const id of ['nav', 'balance-card', 'side-balance', 'model-menu', 'page-title']) {
+  check(`index.html declares #${id}`, html.includes(`id="${id}"`));
+}
+check('renderer has a page router', app.includes('function showPage(') && app.includes('dataset.page'));
+check('renderer captures panel command output', app.includes('function captureCommand(') && app.includes('capture.messages.push'));
+check('renderer offers a model switcher', app.includes('get_available_models') && app.includes("type: 'set_model'"));
+check('renderer offers thinking levels', app.includes('get_available_thinking_levels') && app.includes('set_thinking_level'));
+check('renderer persists desktop prefs', app.includes('localStorage') && app.includes('fairy-pi.desktop.prefs'));
+check('renderer drives the vendored mascot speed knob', app.includes('--dsh-fairy-steady-rate'));
+check('stylesheet carries both themes', styles.includes('[data-theme="light"]') && styles.includes('[data-theme="dark"]'));
+check('stylesheet paints the DSH background grid', styles.includes('.hdd-glow-a') && styles.includes('.hdd-fx'));
+check('stylesheet paints the sidebar board ridge', styles.includes('.sidebar-board') && styles.includes('.brand-eye'));
+
 console.log('pi discovery');
 const { existsSync } = require('node:fs');
 const { agentDirCandidates, resolveAgentDir, resolvePi, resolveNode } = require(path.join(root, 'src', 'pi-locate.cjs'));

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN" data-fairy-pi-theme="dark">
+<html lang="zh-CN" data-theme="dark">
   <head>
     <meta charset="utf-8" />
     <meta
@@ -11,57 +11,402 @@
     <link rel="stylesheet" href="vendor/fairy-mascot.css" />
   </head>
   <body>
+    <svg class="icon-sprite" aria-hidden="true" focusable="false">
+      <symbol id="i-chat" viewBox="0 0 24 24">
+        <path d="M20 15a2 2 0 0 1-2 2H8l-4 3V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z" />
+      </symbol>
+      <symbol id="i-wallet" viewBox="0 0 24 24">
+        <rect x="3" y="6" width="18" height="13" rx="2" />
+        <path d="M3 10h18" />
+        <circle cx="16.5" cy="14.5" r="1" />
+      </symbol>
+      <symbol id="i-voice" viewBox="0 0 24 24">
+        <path d="M4 9v6h3l4 3V6L7 9H4z" />
+        <path d="M14 8.5a5 5 0 0 1 0 7" />
+        <path d="M16.6 6a8 8 0 0 1 0 12" />
+      </symbol>
+      <symbol id="i-persona" viewBox="0 0 24 24">
+        <circle cx="12" cy="8" r="3.5" />
+        <path d="M5 20a7 7 0 0 1 14 0" />
+      </symbol>
+      <symbol id="i-skills" viewBox="0 0 24 24">
+        <path d="M11 3l1.6 4.6L17 9.2l-4.4 1.6L11 15.4l-1.6-4.6L5 9.2l4.4-1.6z" />
+        <path d="M18 15l.8 2.2 2.2.8-2.2.8L18 21l-.8-2.2-2.2-.8 2.2-.8z" />
+      </symbol>
+      <symbol id="i-browser" viewBox="0 0 24 24">
+        <rect x="3" y="4" width="18" height="16" rx="2" />
+        <path d="M3 9h18" />
+        <path d="M6.6 6.5h.01M9 6.5h.01" />
+      </symbol>
+      <symbol id="i-settings" viewBox="0 0 24 24">
+        <path d="M4 7h9M18.5 7H20M4 17h5M14 17h6" />
+        <circle cx="15.5" cy="7" r="2" />
+        <circle cx="11" cy="17" r="2" />
+      </symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24">
+        <path d="M20 12a8 8 0 1 1-2.3-5.6" />
+        <path d="M20 4v5h-5" />
+      </symbol>
+      <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" /></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 13l4 4 10-10" /></symbol>
+      <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" /></symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4" />
+      </symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24">
+        <path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z" />
+      </symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24">
+        <path d="M4 7a2 2 0 0 1 2-2h3l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" />
+      </symbol>
+      <symbol id="i-send" viewBox="0 0 24 24">
+        <path d="M4 12l16-8-6 16-3-6z" />
+      </symbol>
+      <symbol id="i-link" viewBox="0 0 24 24">
+        <path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1" />
+        <path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1" />
+      </symbol>
+    </svg>
+
+    <div class="hdd-fx" aria-hidden="true">
+      <div class="hdd-glow hdd-glow-a"></div>
+      <div class="hdd-glow hdd-glow-b"></div>
+      <div class="hdd-glow hdd-glow-c"></div>
+    </div>
+
     <div id="app">
-      <header class="topbar">
-        <div class="brand">
-          <span class="brand-mark">F</span>
-          <span class="brand-name">Fairy-pi</span>
-        </div>
-        <div class="topbar-meta">
-          <span class="chip" id="chip-model" title="当前模型">模型 —</span>
-          <span class="chip chip-path" id="chip-cwd" title="pi 的工作目录">目录 —</span>
-        </div>
-        <div class="topbar-stats">
-          <span class="stat" id="stat-tokens" title="本会话 token 用量">0 tok</span>
-          <span class="stat" id="stat-cost" title="本会话累计成本（估算）">$0.0000</span>
-          <span class="stat" id="stat-context" title="上下文占用">0%</span>
-        </div>
-        <div class="topbar-actions">
-          <button type="button" id="btn-voice" class="ghost" aria-pressed="false" title="朗读助手回复">语音</button>
-          <button type="button" id="btn-workdir" class="ghost" title="切换工作目录（会重启 pi）">目录</button>
-          <button type="button" id="btn-new" class="ghost" title="开始新会话">新会话</button>
-          <button type="button" id="btn-abort" class="ghost" title="中断当前运行">中断</button>
-        </div>
-      </header>
+      <aside id="sidebar">
+        <div class="sidebar-board">
+          <div class="brand" id="brand">
+            <span class="brand-eye" aria-hidden="true">
+              <i class="brow" data-side="top"></i>
+              <i class="brow" data-side="right"></i>
+              <i class="brow" data-side="bottom"></i>
+              <i class="brow" data-side="left"></i>
+            </span>
+            <span class="brand-copy">
+              <span class="brand-title">Fairy-pi</span>
+              <span class="brand-sub">PI DESKTOP CLIENT</span>
+            </span>
+          </div>
 
-      <main id="stage">
-        <div id="fairy-stage" class="hero">
-          <div id="fairy-mount"></div>
-          <div id="fairy-caption">Fairy 待机中</div>
-        </div>
-        <section id="empty-state">
-          <h1>Fairy-pi</h1>
-          <p class="empty-sub">pi 的桌面端。<code>Enter</code> 发送，<code>Shift</code>+<code>Enter</code> 换行，输入 <code>/</code> 查看命令。</p>
-          <div class="mascot-slot" aria-hidden="true"></div>
-          <div id="empty-hints"></div>
-        </section>
-        <section id="messages" aria-live="polite"></section>
-      </main>
+          <button type="button" class="sidebar-new" id="btn-new-session">
+            <svg class="ico" aria-hidden="true"><use href="#i-plus" /></svg>
+            <span>新会话</span>
+          </button>
 
-      <div id="widgets"></div>
-      <div id="statusbar"></div>
+          <nav id="nav" aria-label="主导航"></nav>
 
-      <form id="composer" autocomplete="off">
-        <div id="slash-menu" hidden></div>
-        <div class="composer-row">
-          <textarea id="input" rows="1" placeholder="给 pi 说点什么…" spellcheck="false"></textarea>
-          <button type="submit" id="btn-send" class="primary">发送</button>
+          <div class="sidebar-spacer"></div>
+
+          <button type="button" class="balance-card" id="balance-card" title="DeepSeek 余额与今日用量">
+            <span class="balance-row">
+              <span class="balance-label">余额</span>
+              <span class="balance-value" id="side-balance">—</span>
+            </span>
+            <span class="balance-row">
+              <span class="balance-label">今日token</span>
+              <span class="balance-value" id="side-today">—</span>
+            </span>
+            <span class="balance-row balance-row-wide">
+              <span class="balance-label">今日估算</span>
+              <span class="balance-value" id="side-cost">—</span>
+            </span>
+          </button>
+
+          <div class="sidebar-foot">
+            <span id="run-state" class="run-state idle">未连接</span>
+            <button type="button" class="icon-btn" id="btn-theme" title="切换明暗主题">
+              <svg class="ico" aria-hidden="true"><use href="#i-moon" /></svg>
+            </button>
+            <button type="button" class="icon-btn" id="btn-goto-settings" title="设置">
+              <svg class="ico" aria-hidden="true"><use href="#i-settings" /></svg>
+            </button>
+          </div>
         </div>
-        <div class="composer-foot">
-          <span id="run-state" class="run-state idle">空闲</span>
-          <span id="queue" class="queue"></span>
-        </div>
-      </form>
+      </aside>
+
+      <div id="workspace">
+        <header class="topbar">
+          <div class="topbar-title">
+            <h1 id="page-title">对话</h1>
+            <span class="topbar-sub" id="page-sub"></span>
+          </div>
+
+          <div class="topbar-meta">
+            <button type="button" class="chip chip-model" id="chip-model" aria-haspopup="menu" aria-expanded="false" title="切换模型">
+              <span id="chip-model-name">模型 —</span>
+              <svg class="ico" aria-hidden="true"><use href="#i-chevron" /></svg>
+            </button>
+            <button type="button" class="chip chip-path" id="chip-cwd" title="pi 的工作目录">目录 —</button>
+          </div>
+
+          <div class="topbar-stats">
+            <span class="stat" id="stat-tokens" title="本会话 token 用量">0 tok</span>
+            <span class="stat" id="stat-cost" title="本会话累计成本（估算）">$0.0000</span>
+            <span class="stat" id="stat-context" title="上下文占用">0%</span>
+          </div>
+
+          <div class="topbar-actions">
+            <button type="button" id="btn-voice" class="ghost" aria-pressed="false" title="朗读助手回复">语音</button>
+            <button type="button" id="btn-workdir" class="ghost" title="切换工作目录（会重启 pi）">目录</button>
+            <button type="button" id="btn-new" class="ghost" title="开始新会话">新会话</button>
+            <button type="button" id="btn-abort" class="ghost" title="中断当前运行">中断</button>
+          </div>
+        </header>
+
+        <div id="model-menu" class="model-menu" role="menu" hidden></div>
+
+        <main id="pages">
+          <section class="page active" id="page-chat" data-page="chat">
+            <div id="stage">
+              <div id="fairy-stage" class="hero">
+                <div id="fairy-mount"></div>
+                <div id="fairy-caption">Fairy 待机中</div>
+              </div>
+              <section id="empty-state">
+                <h1 class="hero-title">Fairy-pi</h1>
+                <p class="hero-sub"><span>PI DESKTOP</span></p>
+                <div class="mascot-slot" aria-hidden="true"></div>
+                <p class="empty-sub">
+                  <code>Enter</code> 发送，<code>Shift</code>+<code>Enter</code> 换行，输入 <code>/</code> 查看命令。
+                </p>
+                <div id="empty-hints"></div>
+              </section>
+              <section id="messages" aria-live="polite"></section>
+            </div>
+            <div id="widgets"></div>
+            <div id="statusbar"></div>
+            <form id="composer" autocomplete="off">
+              <div id="slash-menu" hidden></div>
+              <div class="composer-row">
+                <textarea id="input" rows="1" placeholder="给 pi 说点什么…" spellcheck="false"></textarea>
+                <button type="submit" id="btn-send" class="primary" title="发送">
+                  <svg class="ico" aria-hidden="true"><use href="#i-send" /></svg>
+                  <span id="btn-send-label">发送</span>
+                </button>
+              </div>
+              <div class="composer-foot">
+                <span id="queue" class="queue"></span>
+              </div>
+            </form>
+          </section>
+
+          <section class="page" id="page-balance" data-page="balance" hidden>
+            <div class="page-scroll">
+              <div class="panel" id="balance-panel">
+                <div class="panel-head">
+                  <h2>DeepSeek 余额</h2>
+                  <button type="button" class="ghost" id="btn-balance-refresh">
+                    <svg class="ico" aria-hidden="true"><use href="#i-refresh" /></svg>
+                    <span>刷新</span>
+                  </button>
+                </div>
+                <div class="metric-grid" id="balance-figures">
+                  <div class="metric"><span class="metric-label">余额</span><span class="metric-value" id="bal-balance">—</span></div>
+                  <div class="metric"><span class="metric-label">今日 token</span><span class="metric-value" id="bal-today">—</span></div>
+                  <div class="metric"><span class="metric-label">今日估算</span><span class="metric-value" id="bal-cost">—</span></div>
+                  <div class="metric"><span class="metric-label">Pi 记账</span><span class="metric-value" id="bal-ledger">—</span></div>
+                </div>
+                <p class="panel-note" id="balance-source">尚未查询。点「刷新」向 DeepSeek 拉取余额与当日用量估算。</p>
+              </div>
+
+              <div class="panel">
+                <div class="panel-head"><h2>本会话</h2></div>
+                <div class="metric-grid">
+                  <div class="metric"><span class="metric-label">token 总量</span><span class="metric-value" id="sess-tokens">0</span></div>
+                  <div class="metric"><span class="metric-label">累计成本</span><span class="metric-value" id="sess-cost">$0.0000</span></div>
+                  <div class="metric"><span class="metric-label">上下文占用</span><span class="metric-value" id="sess-context">0%</span></div>
+                  <div class="metric"><span class="metric-label">消息数</span><span class="metric-value" id="sess-messages">0</span></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="page" id="page-voice" data-page="voice" hidden>
+            <div class="page-scroll">
+              <div class="panel">
+                <div class="panel-head"><h2>朗读</h2></div>
+                <div class="field-row">
+                  <label class="field-label" for="voice-enabled">朗读助手回复</label>
+                  <input type="checkbox" id="voice-enabled" class="switch" />
+                </div>
+                <div class="field-row">
+                  <label class="field-label" for="voice-name">音色</label>
+                  <select id="voice-name" class="field-select"></select>
+                </div>
+                <div class="field-row">
+                  <label class="field-label" for="voice-rate">语速</label>
+                  <input type="range" id="voice-rate" min="0.7" max="1.5" step="0.05" />
+                  <span class="field-value" id="voice-rate-value">1.00</span>
+                </div>
+                <div class="field-row">
+                  <span class="field-label"></span>
+                  <button type="button" class="ghost" id="btn-voice-test">试听一句</button>
+                </div>
+                <p class="panel-note">用 Chromium 的 Web Speech 朗读（Windows 上即系统语音），朗读前会剥离 Markdown 与代码块。</p>
+              </div>
+
+              <div class="panel">
+                <div class="panel-head">
+                  <h2>本地 Fairy 语音服务</h2>
+                  <button type="button" class="ghost" id="btn-voice-status">
+                    <svg class="ico" aria-hidden="true"><use href="#i-refresh" /></svg>
+                    <span>探测</span>
+                  </button>
+                </div>
+                <pre class="panel-pre" id="voice-service">尚未探测。</pre>
+                <p class="panel-note">
+                  <code>/fairy-voice say &lt;文本&gt;</code> 走本地 TTS（默认 <code>http://127.0.0.1:9880</code>），不可用时回退 Windows 内置语音；
+                  <code>/fairy-voice brief</code> 把长回答压成朗读简报。
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section class="page" id="page-persona" data-page="persona" hidden>
+            <div class="page-scroll">
+              <div class="panel">
+                <div class="panel-head">
+                  <h2>Fairy 人格注入</h2>
+                  <button type="button" class="ghost" id="btn-persona-refresh">
+                    <svg class="ico" aria-hidden="true"><use href="#i-refresh" /></svg>
+                    <span>刷新</span>
+                  </button>
+                </div>
+                <div class="field-row">
+                  <label class="field-label" for="persona-enabled">启用（会话级，不持久化）</label>
+                  <input type="checkbox" id="persona-enabled" class="switch" />
+                </div>
+                <pre class="panel-pre" id="persona-status">尚未查询。</pre>
+              </div>
+              <div class="panel">
+                <div class="panel-head"><h2>语料</h2></div>
+                <div id="persona-corpus" class="corpus-list"></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="page" id="page-skills" data-page="skills" hidden>
+            <div class="page-scroll">
+              <div class="panel">
+                <div class="panel-head">
+                  <h2>技能</h2>
+                  <button type="button" class="ghost" id="btn-skills-refresh">
+                    <svg class="ico" aria-hidden="true"><use href="#i-refresh" /></svg>
+                    <span>刷新</span>
+                  </button>
+                </div>
+                <div id="skills-list" class="skill-list"></div>
+              </div>
+              <div class="panel">
+                <div class="panel-head"><h2>扩展命令</h2></div>
+                <div id="ext-list" class="skill-list"></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="page" id="page-browser" data-page="browser" hidden>
+            <div class="page-scroll">
+              <div class="panel">
+                <div class="panel-head">
+                  <h2>浏览器坞</h2>
+                  <button type="button" class="ghost" id="btn-browser-refresh">
+                    <svg class="ico" aria-hidden="true"><use href="#i-refresh" /></svg>
+                    <span>刷新</span>
+                  </button>
+                </div>
+                <div class="field-row">
+                  <span class="status-pill" id="browser-status">未查询</span>
+                  <span class="field-value" id="browser-url"></span>
+                </div>
+                <div class="button-row">
+                  <button type="button" class="ghost" data-browser-cmd="bind">激活</button>
+                  <button type="button" class="ghost" data-browser-cmd="close">关闭</button>
+                  <button type="button" class="ghost" data-browser-cmd="takeover">接管</button>
+                </div>
+                <pre class="panel-pre" id="browser-state">尚未查询。</pre>
+                <p class="panel-note">
+                  坞需要外部 MCP 生产者（见 README 的 <code>dock-producer.cjs</code> / <code>mcp.json</code>）。不接生产者时这里会如实显示「未激活」。
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section class="page" id="page-settings" data-page="settings" hidden>
+            <div class="page-scroll">
+              <div class="panel">
+                <div class="panel-head"><h2>模型</h2></div>
+                <div class="field-row">
+                  <label class="field-label" for="set-model">当前模型</label>
+                  <select id="set-model" class="field-select"></select>
+                  <button type="button" class="ghost" id="btn-set-model">切换</button>
+                </div>
+                <div class="field-row">
+                  <label class="field-label" for="set-thinking">思考档位</label>
+                  <select id="set-thinking" class="field-select"></select>
+                  <button type="button" class="ghost" id="btn-set-thinking">应用</button>
+                </div>
+                <p class="panel-note">数据来自 pi 的 <code>get_available_models</code>；切换走 <code>set_model</code>，即时生效、不重启会话。</p>
+              </div>
+
+              <div class="panel">
+                <div class="panel-head"><h2>工作目录</h2></div>
+                <div class="field-row">
+                  <span class="field-label">目录</span>
+                  <span class="field-value mono" id="set-cwd">—</span>
+                  <button type="button" class="ghost" id="btn-set-workdir">
+                    <svg class="ico" aria-hidden="true"><use href="#i-folder" /></svg>
+                    <span>选择</span>
+                  </button>
+                </div>
+                <p class="panel-note">切换目录会重启 pi 子进程（RPC 模式没有在线换目录的接口）。</p>
+              </div>
+
+              <div class="panel">
+                <div class="panel-head"><h2>外观</h2></div>
+                <div class="field-row">
+                  <label class="field-label" for="set-theme">主题</label>
+                  <select id="set-theme" class="field-select">
+                    <option value="dark">深色</option>
+                    <option value="light">浅色</option>
+                  </select>
+                </div>
+                <div class="field-row">
+                  <label class="field-label" for="set-mascot">显示 Fairy 形象</label>
+                  <input type="checkbox" id="set-mascot" class="switch" />
+                </div>
+                <div class="field-row">
+                  <label class="field-label" for="set-mascot-scale">形象大小</label>
+                  <input type="range" id="set-mascot-scale" min="0.55" max="1" step="0.05" />
+                  <span class="field-value" id="set-mascot-scale-value">1.00</span>
+                </div>
+                <div class="field-row">
+                  <label class="field-label" for="set-mascot-speed">动画速度</label>
+                  <select id="set-mascot-speed" class="field-select">
+                    <option value="0.7">慢</option>
+                    <option value="1">标准</option>
+                    <option value="1.5">快</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="panel">
+                <div class="panel-head"><h2>会话与运行时</h2></div>
+                <div class="metric-grid">
+                  <div class="metric"><span class="metric-label">会话 id</span><span class="metric-value mono" id="info-session">—</span></div>
+                  <div class="metric"><span class="metric-label">消息数</span><span class="metric-value" id="info-messages">0</span></div>
+                  <div class="metric"><span class="metric-label">pi 版本</span><span class="metric-value mono" id="info-pi">—</span></div>
+                  <div class="metric"><span class="metric-label">Electron</span><span class="metric-value mono" id="info-electron">—</span></div>
+                </div>
+                <pre class="panel-pre" id="info-paths">—</pre>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
     </div>
 
     <div id="toasts" aria-live="polite"></div>

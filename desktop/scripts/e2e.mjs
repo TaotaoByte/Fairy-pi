@@ -126,11 +126,20 @@ const readState = `(() => {
     assistantText: bubbles.filter((b) => b.classList.contains('msg-assistant')).map((b) => b.innerText).join('\\n'),
     userText: bubbles.filter((b) => b.classList.contains('msg-user')).map((b) => b.innerText).join('\\n'),
     errors: Array.from(document.querySelectorAll('.toast.error')).map((t) => t.innerText),
-    model: document.getElementById('chip-model').innerText,
+    model: document.getElementById('chip-model-name').innerText,
     tokens: document.getElementById('stat-tokens').innerText,
     cost: document.getElementById('stat-cost').innerText,
     runState: document.getElementById('run-state').innerText,
     title: document.title,
+    navItems: Array.from(document.querySelectorAll('#nav .nav-item')).map((b) => b.dataset.page),
+    activePage: (document.querySelector('#pages .page.active') || {}).dataset?.page || null,
+    pageTitle: document.getElementById('page-title').innerText,
+    sideBalance: document.getElementById('side-balance').innerText,
+    sideToday: document.getElementById('side-today').innerText,
+    modelMenuOpen: !document.getElementById('model-menu').hidden,
+    modelOptions: document.querySelectorAll('#model-menu .model-option').length,
+    settingsModels: document.getElementById('set-model').options.length,
+    modelSelectValue: document.getElementById('set-model').value,
   };
 })()`;
 
@@ -156,12 +165,70 @@ async function main() {
   check('无启动错误提示', boot.value && boot.value.errors.length === 0, JSON.stringify(boot.value && boot.value.errors));
 
   const shotDir = process.env.FAIRY_PI_E2E_SCREENSHOT_DIR;
+  if (shotDir) mkdirSync(shotDir, { recursive: true });
+
+  // --- shell: sidebar navigation, pages and the model menu ---------------
+  check('侧边栏有 7 个导航项', boot.value.navItems.length === 7, JSON.stringify(boot.value.navItems));
+  check('默认停在对话页', boot.value.activePage === 'chat', boot.value.activePage);
+
+  // The sidebar balance card is filled by running /fairy-balance once at boot.
+  let balance = '—';
+  const balanceDeadline = Date.now() + 25000;
+  while (Date.now() < balanceDeadline) {
+    const read = await cdp.evaluate(readState);
+    balance = read.value && read.value.sideBalance;
+    if (balance && balance !== '—') break;
+    await sleep(1200);
+  }
+  if (balance && balance !== '—') check('侧边栏余额卡已填充', true, balance);
+  else console.log('  note 余额卡仍为空（网络或本地服务未就绪），跳过余额断言');
+
   if (shotDir) {
-    mkdirSync(shotDir, { recursive: true });
     const welcome = path.join(shotDir, 'screenshot.png');
     const saved = await cdp.captureScreenshot(welcome);
     check('欢迎态截图已保存', saved, welcome);
   }
+
+  await cdp.evaluate(`document.querySelector('#nav .nav-item[data-page="balance"]').click()`);
+  await sleep(1200);
+  const balancePage = await cdp.evaluate(readState);
+  check('点「余额」切到余额页', balancePage.value.activePage === 'balance', balancePage.value.activePage);
+  check('余额页显示余额数值', /CNY|¥|\d/.test(balancePage.value.sideBalance), balancePage.value.sideBalance);
+  if (shotDir) {
+    const saved = await cdp.captureScreenshot(path.join(shotDir, 'screenshot-balance.png'));
+    check('余额页截图已保存', saved);
+  }
+
+  await cdp.evaluate(`document.querySelector('#nav .nav-item[data-page="settings"]').click()`);
+  await sleep(1200);
+  const settings = await cdp.evaluate(readState);
+  check('点「设置」切到设置页', settings.value.activePage === 'settings', settings.value.activePage);
+  check('页面标题跟着切', settings.value.pageTitle === '设置', settings.value.pageTitle);
+  check('设置页列出了模型', settings.value.settingsModels > 1, String(settings.value.settingsModels));
+  check('模型下拉选中当前模型', /deepseek/.test(settings.value.modelSelectValue || ''), settings.value.modelSelectValue);
+  if (shotDir) {
+    const saved = await cdp.captureScreenshot(path.join(shotDir, 'screenshot-settings.png'));
+    check('设置页截图已保存', saved);
+  }
+
+  await cdp.evaluate(`document.getElementById('chip-model').click()`);
+  await sleep(600);
+  const menu = await cdp.evaluate(readState);
+  check('模型菜单能打开', menu.value.modelMenuOpen === true);
+  check('模型菜单列出了模型', menu.value.modelOptions > 1, String(menu.value.modelOptions));
+  if (shotDir) {
+    const saved = await cdp.captureScreenshot(path.join(shotDir, 'screenshot-models.png'));
+    check('模型菜单截图已保存', saved);
+  }
+  await cdp.evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
+  await sleep(400);
+  const closed = await cdp.evaluate(readState);
+  check('Esc 关闭模型菜单', closed.value.modelMenuOpen === false);
+
+  await cdp.evaluate(`document.querySelector('#nav .nav-item[data-page="chat"]').click()`);
+  await sleep(500);
+  const back = await cdp.evaluate(readState);
+  check('能切回对话页', back.value.activePage === 'chat', back.value.activePage);
 
   // The submit listener clears the field synchronously inside dispatchEvent,
   // so read the value back before dispatching.

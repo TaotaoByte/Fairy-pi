@@ -211,6 +211,23 @@ async function main() {
     check('设置页截图已保存', saved);
   }
 
+  const themeLight = await cdp.evaluate(`(() => {
+    document.getElementById('btn-theme').click();
+    return document.documentElement.dataset.theme;
+  })()`);
+  check('主题能切到浅色', themeLight.value === 'light', String(themeLight.value));
+  await sleep(500);
+  if (shotDir) {
+    const saved = await cdp.captureScreenshot(path.join(shotDir, 'screenshot-light.png'));
+    check('浅色主题截图已保存', saved);
+  }
+  const themeDark = await cdp.evaluate(`(() => {
+    document.getElementById('btn-theme').click();
+    return document.documentElement.dataset.theme;
+  })()`);
+  check('主题能切回深色', themeDark.value === 'dark', String(themeDark.value));
+  await sleep(400);
+
   await cdp.evaluate(`document.getElementById('chip-model').click()`);
   await sleep(600);
   const menu = await cdp.evaluate(readState);

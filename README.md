@@ -38,7 +38,7 @@ npm start          # 开发态启动（自动先重建 Fairy 形象包）
 npm run package    # 打包 → ../out/Fairy-pi-win32-x64/Fairy-pi.exe
 ```
 
-界面是一套左侧边栏 + 多页面的客户端，信息架构、配色令牌与图标语汇都对着 Fairy-DSH 的深色 web 客户端做（配色直接取上游的 `--dsw-alias-*` 值，含浅色一套）。界面预览：[欢迎态](desktop/docs/screenshot.png) · [余额页](desktop/docs/screenshot-balance.png) · [设置页](desktop/docs/screenshot-settings.png) · [模型菜单](desktop/docs/screenshot-models.png) · [对话态](desktop/docs/screenshot-conversation.png)。
+界面是一套左侧边栏 + 多页面的客户端，信息架构、配色令牌与图标语汇都对着 Fairy-DSH 的深色 web 客户端做（配色直接取上游的 `--dsw-alias-*` 值，含浅色一套）。界面预览：[欢迎态](desktop/docs/screenshot.png) · [余额页](desktop/docs/screenshot-balance.png) · [设置页](desktop/docs/screenshot-settings.png) · [模型菜单](desktop/docs/screenshot-models.png) · [浅色主题](desktop/docs/screenshot-light.png) · [对话态](desktop/docs/screenshot-conversation.png)。
 
 - **侧边栏**：Fairy 眼形品牌标记 + 「新会话」+ 七个导航项（对话 / 余额 / 语音 / 人格 / 技能 / 浏览器坞 / 设置），底部是一张**余额卡**——正是 DSH 那个 `sidebar.footer.action` 槽位的对应物，直接显示余额、今日 token、今日估算，不需要输命令。
 - **模型切换**：顶部模型 chip 点开就是一个按 provider 分组的菜单（模型名 + 推理标签 + 上下文窗口），点击即走 `set_model` **热切换**，不重启会话；设置页里另有下拉 + 「思考档位」（`get_available_thinking_levels` / `set_thinking_level`）。
@@ -124,7 +124,7 @@ npm run test:e2e   # 真开窗口：切页面、开模型菜单、填空拍提�
 
 浏览器坞生产者：4 项集成测试真的起两个进程（代理 + 假 MCP）用 JSON-RPC 驱动，覆盖透明转发、任意图片落帧、工具名/参数命中人机验证、`takeover`/`close` 与收场清理；另有 2 项入口测试覆盖 `FAIRY_PI_BROWSER_MCP_ARGS` 的解析与注册。
 
-**桌面端**：先用一个探针脚本确认 `pi --mode rpc` 的握手（`get_state` / `get_commands` / `get_session_stats` / `get_available_models` 均正常返回、关 stdin 后干净退出），并实测 `set_model` 能热切换（切到 `deepseek-flash` 后 `get_state` 跟着变），然后对**打包出来的 `Fairy-pi.exe`** 跑了端到端：CDP 把它当用户操作——点侧边栏切页、开模型菜单、按 Esc 关闭、填输入框、派发提交、轮询界面——**28 项全部通过**（含欢迎态、余额页、设置页、模型菜单、对话态五张截图落盘），其中窗口标题为 `Fairy-pi · pi 1.0.4`、模型 chip 显示 `DeepSeek V4 Pro · deepseek`、侧边栏有 7 个导航项、余额卡自动填成 `13.87 CNY`、设置页列出 12 个模型、模型菜单 12 行且当前模型高亮、用户消息与助手回复都在屏上、`agent_settled` 后运行态回「空闲」、用量累计到 `5,835 tok`。Fairy 形象确实挂载（`[data-dsh-fairy-mascot-root="true"]`），子进程确认为 `node.exe <pi cli.js> --mode rpc`。
+**桌面端**：先用一个探针脚本确认 `pi --mode rpc` 的握手（`get_state` / `get_commands` / `get_session_stats` / `get_available_models` 均正常返回、关 stdin 后干净退出），并实测 `set_model` 能热切换（切到 `deepseek-flash` 后 `get_state` 跟着变），然后对**打包出来的 `Fairy-pi.exe`** 跑了端到端：CDP 把它当用户操作——点侧边栏切页、开模型菜单、按 Esc 关闭、填输入框、派发提交、轮询界面——**31 项全部通过**（含欢迎态、余额页、设置页、模型菜单、浅色主题、对话态六张截图落盘），其中窗口标题为 `Fairy-pi · pi 1.0.4`、模型 chip 显示 `DeepSeek V4 Pro · deepseek`、侧边栏有 7 个导航项、余额卡自动填成 `13.87 CNY`、设置页列出 12 个模型、模型菜单 12 行且当前模型高亮、用户消息与助手回复都在屏上、`agent_settled` 后运行态回「空闲」、用量累计到 `5,835 tok`。Fairy 形象确实挂载（`[data-dsh-fairy-mascot-root="true"]`），子进程确认为 `node.exe <pi cli.js> --mode rpc`。
 
 **命令名必须原样使用**：`get_commands` 里同名的两个命令，pi 会改名为 `fairy-voice:1` / `fairy-voice:2`（本机实测：`:1` 是旧的 pi-fairy 桌宠包，`:2` 是本包；那之后已用 `pi remove "G:\AI_Project\pi-fairy"` 卸掉旧包，现在本机只剩无后缀的 `fairy-voice`）。这两个后缀名才是可派发的命令——把后缀去掉得到的 `/fairy-voice` 不是命令，pi 会**把它当普通输入交给模型**（实测回包 `disposition: "started"`，模型开始翻目录找这个技能）。所以命令面板与欢迎态 chips 一律显示 `get_commands` 给出的原始名字，不做美化。
 

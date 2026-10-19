@@ -27,6 +27,35 @@ pi install /path/to/Fairy-pi
 
 本包**没有**运行时依赖 `@earendil-works/*`（只有 `import type`），宿主包不存在重复实例问题。唯一的运行时依赖是朗读文本管线用的三个 mdast/micromark 包。
 
+## 桌面端（双击即用）
+
+`desktop/` 是一个 Electron 外壳：**双击 `Fairy-pi.exe` 就得到 pi 的图形界面**。它不实现自己的 agent——窗口里的对话由一个受管子进程 `pi --mode rpc` 承担，走 pi 官方的 JSONL 协议（`docs/rpc.md`、`rpc-commands.md`、`json.md`、`rpc-extension-ui.md`）。
+
+```bash
+cd desktop
+npm install
+npm start          # 开发态启动（自动先重建 Fairy 形象包）
+npm run package    # 打包 → ../out/Fairy-pi-win32-x64/Fairy-pi.exe
+```
+
+界面构成（信息架构与配色参考 Fairy-DSH 的深色 web 客户端）：
+
+- **Fairy 形象**：直接复用 Fairy-DSH 的 `fairy-visual` 低层绘图模块（几何、眼睛/光晕 SVG、样式表），**原样再分发、未改动**；由 [`build-mascot.mjs`](desktop/scripts/build-mascot.mjs) 打成一个浏览器可用的 IIFE 挂载。待机动画来自这些模块自带的 CSS 关键帧，不需要上游的 `mascot-runtime.js`。会话开始后 Fairy 从居中缩到右上角。
+- **对话**：流式文本、thinking 折叠块、工具调用卡片（运行中/完成/失败 + 结果）、中断、新会话、切换工作目录、排队与 steering。
+- **命令**：输入 `/` 弹出命令面板，数据来自 `get_commands`，因此本包的 `/fairy-balance`、`/fairy-voice`、`/fairy-persona`、`/fairy-browser` 全部可用。
+- **扩展 UI**：实现了 `extension_ui_request` 的 `notify` / `setStatus` / `setWidget` / `setTitle` / `set_editor_text` 与四类对话框，扩展的提示能落到界面上。
+- **语音**：右上角「语音」按钮开启后，用 Chromium 的 Web Speech 朗读助手回复（Windows 上即系统语音）；朗读前会剥离 Markdown 与代码块。
+
+**`pi` 的位置如何找到**：`FAIRY_PI_AGENT_DIR` → `%LOCALAPPDATA%\Programs\pi-agent\agent_data` → PATH 上的 `pi` 启动器 → 各盘符的 `\Users\<你>\AppData\Local\Programs\pi-agent\agent_data`。装在非系统盘时靠最后一条兜底。可用 `FAIRY_PI_AGENT_DIR` / `FAIRY_PI_CLI` / `FAIRY_PI_NODE` / `FAIRY_PI_WORKDIR` 覆盖。
+
+**明确不做什么**：不起 HTTP 服务、不监听端口（`--remote-debugging-port` 只在自动化测试时由测试脚本传入）、不驱动 DSH、不碰 DeepSeek Harness。
+
+```bash
+cd desktop
+npm test           # 静态检查 + 形象包实机求值 + pi 定位
+npm run test:e2e   # 真开窗口、真发一句话、断言回复与用量
+```
+
 ## 命令
 
 | 命令 | 子命令 | 作用 |
@@ -86,6 +115,10 @@ pi install /path/to/Fairy-pi
 
 浏览器坞生产者：4 项集成测试真的起两个进程（代理 + 假 MCP）用 JSON-RPC 驱动，覆盖透明转发、任意图片落帧、工具名/参数命中人机验证、`takeover`/`close` 与收场清理；另有 2 项入口测试覆盖 `FAIRY_PI_BROWSER_MCP_ARGS` 的解析与注册。
 
+**桌面端**：先用一个探针脚本确认 `pi --mode rpc` 的握手（`get_state` / `get_commands` / `get_session_stats` 均正常返回、关 stdin 后干净退出），然后对**打包出来的 `Fairy-pi.exe`** 跑了端到端：CDP 把它当用户操作——填输入框、派发提交、轮询界面——断言 11 项全部通过，其中窗口标题为 `Fairy-pi · pi 1.0.4`、模型 chip 显示 `DeepSeek V4 Pro`、用户消息与助手回复都在屏上、`agent_settled` 后运行态回「空闲」、用量累计到 `5,831 tok`。Fairy 形象确实挂载（`[data-dsh-fairy-mascot-root="true"]`），子进程确认为 `node.exe <pi cli.js> --mode rpc`。
+
+**桌面端的两个真实缺陷**（都是实机跑出来的，不是推演）：一是 `path.join('F:', 'Users')` 会得到盘符相对的 `F:Users`，导致装在非系统盘时定位不到 pi；二是 PATH 分支多剥了一层目录，把 `agent_data` 丢了。两处都已修，并加了不依赖 Electron 的定位单测。
+
 **一处未在本机验证**：`pi --mode json -p` 这次运行里，扩展注册的 MCP 服务器没有留下连接痕迹（`~/.pi/agent/mcp.log` 不存在，生产者也没启动）。所以我没把「方式二」写成已验证——请用交互式 pi 的 `/mcp` 或 `pi mcp list` 确认；「方式一」的 `mcp.json` 是 Pi 自带 MCP 支持直接读取的路径，可先用 `pi mcp list` 验证条目本身。
 
 **跨平台修正**：Windows 上 `rename` 覆盖正被打开的目标会瞬时失败（`EPERM`/`EACCES`/`EBUSY`），而消费者经常在轮询同一个文件。三处落盘（日账、坞状态、坞命令）现在统一走带退避重试的原子替换——这个缺陷是测试轮询状态文件时暴露出来的，不修就会静默丢一次写入。
@@ -107,7 +140,14 @@ Fairy-pi/
 │       └── browser/         浏览器坞文件协议与观察
 ├── skills/fairy-persona/    人格技能（SKILL.md）
 ├── assets/persona/          上游语料（Apache-2.0，未改动内容）
-└── tests/                   88 项测试
+├── desktop/                 Electron 桌面前端（见上节）
+│   ├── src/main.cjs         主进程：进程管理与 RPC 桥
+│   ├── src/pi-locate.cjs    pi 定位（可独立测试）
+│   ├── src/preload.cjs      contextBridge 白名单
+│   ├── src/renderer/        界面（index.html / styles.css / app.js）
+│   ├── vendor/fairy-mascot/ Fairy-DSH 形象模块原样副本
+│   └── scripts/             build-mascot / smoke / e2e / package
+└── tests/                   88 项扩展测试
 ```
 
 ## 开发

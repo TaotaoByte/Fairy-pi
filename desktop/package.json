@@ -1,0 +1,21 @@
+{
+  "name": "fairy-pi-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fairy-pi 桌面前端：双击即用的 pi 图形界面（视觉与信息架构参考 Fairy-DSH）",
+  "license": "Apache-2.0",
+  "main": "src/main.cjs",
+  "scripts": {
+    "prestart": "node scripts/build-mascot.mjs",
+    "start": "electron .",
+    "test": "node scripts/smoke.mjs",
+    "test:e2e": "node scripts/e2e.mjs",
+    "build:mascot": "node scripts/build-mascot.mjs",
+    "smoke": "node scripts/smoke.mjs",
+    "package": "node scripts/package.mjs"
+  },
+  "devDependencies": {
+    "@electron/packager": "^18.4.0",
+    "electron": "^33.2.0"
+  }
+}

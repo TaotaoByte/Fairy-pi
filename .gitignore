@@ -1,3 +1,6 @@
 node_modules/
+desktop/node_modules/
+out/
+desktop/out/
 *.log
-.DS_Store
+.test-out.txt

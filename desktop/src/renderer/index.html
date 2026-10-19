@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN" data-fairy-pi-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'"
+    />
+    <title>Fairy-pi</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="vendor/fairy-mascot.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark">F</span>
+          <span class="brand-name">Fairy-pi</span>
+        </div>
+        <div class="topbar-meta">
+          <span class="chip" id="chip-model" title="当前模型">模型 —</span>
+          <span class="chip chip-path" id="chip-cwd" title="pi 的工作目录">目录 —</span>
+        </div>
+        <div class="topbar-stats">
+          <span class="stat" id="stat-tokens" title="本会话 token 用量">0 tok</span>
+          <span class="stat" id="stat-cost" title="本会话累计成本（估算）">$0.0000</span>
+          <span class="stat" id="stat-context" title="上下文占用">0%</span>
+        </div>
+        <div class="topbar-actions">
+          <button type="button" id="btn-voice" class="ghost" aria-pressed="false" title="朗读助手回复">语音</button>
+          <button type="button" id="btn-workdir" class="ghost" title="切换工作目录（会重启 pi）">目录</button>
+          <button type="button" id="btn-new" class="ghost" title="开始新会话">新会话</button>
+          <button type="button" id="btn-abort" class="ghost" title="中断当前运行">中断</button>
+        </div>
+      </header>
+
+      <main id="stage">
+        <div id="fairy-stage" class="hero">
+          <div id="fairy-mount"></div>
+          <div id="fairy-caption">Fairy 待机中</div>
+        </div>
+        <section id="empty-state">
+          <h1>Fairy-pi</h1>
+          <p class="empty-sub">pi 的桌面端。<code>Enter</code> 发送，<code>Shift</code>+<code>Enter</code> 换行，输入 <code>/</code> 查看命令。</p>
+          <div id="empty-hints"></div>
+        </section>
+        <section id="messages" aria-live="polite"></section>
+      </main>
+
+      <div id="widgets"></div>
+      <div id="statusbar"></div>
+
+      <form id="composer" autocomplete="off">
+        <div id="slash-menu" hidden></div>
+        <div class="composer-row">
+          <textarea id="input" rows="1" placeholder="给 pi 说点什么…" spellcheck="false"></textarea>
+          <button type="submit" id="btn-send" class="primary">发送</button>
+        </div>
+        <div class="composer-foot">
+          <span id="run-state" class="run-state idle">空闲</span>
+          <span id="queue" class="queue"></span>
+        </div>
+      </form>
+    </div>
+
+    <div id="toasts" aria-live="polite"></div>
+    <div id="modal-root" hidden></div>
+
+    <script src="vendor/fairy-mascot.bundle.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

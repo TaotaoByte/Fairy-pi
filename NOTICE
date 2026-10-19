@@ -39,8 +39,18 @@ Copyright 2026 Fairy-pi contributors
 6. fairy-system/               → scripts/
    离线校验的检查项与判定口径；DSH_* 环境变量改为包内参数。
 
+7. fairy-visual/dsh-fairy-visual/src/client/  → desktop/vendor/fairy-mascot/
+   Fairy 形象的低层绘图模块原样再分发（未改动）：mascot-geometry.js、
+   mascot-eye-svg.js、mascot-effects-svg.js、mascot-style.js。
+   这些模块是纯计算/字符串生成，无 DSH 依赖，因此可脱离 Cordis 运行。
+   上游的 mascot-runtime.js（订阅 DSH 会话事件、写入 CSS 自定义属性、故障/过渡特效）
+   未再分发；desktop/scripts/build-mascot.mjs 把上述四个模块包成一个浏览器可用的 IIFE，
+   由 desktop/src/renderer 挂载。dsh-fairy-visual 的插件外壳（DSH 客户端插件清单、
+   settings.register、composer 装饰）未移植。
+
 未再分发（上游公开仓库中不存在，故无法移植）：
 - .agent-presets/fairy/runtime/{index.js, fairy_core.py, safety-gate.js}
 
-本包不含 pi-fairy / pi-fairy-win 的任何内容；动画与桌面层由用户已安装的独立包提供，
-两者不共享代码。
+本包不含 pi-fairy / pi-fairy-win 的任何内容；旧桌面宠物由用户已安装的独立包提供，
+两者不共享代码。desktop/ 的语音朗读使用 Chromium 自带的 Web Speech（Windows 上即
+系统语音），与 pi-fairy 的原生桌宠无代码关系。

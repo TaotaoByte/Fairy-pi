@@ -38,11 +38,11 @@ npm start          # 开发态启动（自动先重建 Fairy 形象包）
 npm run package    # 打包 → ../out/Fairy-pi-win32-x64/Fairy-pi.exe
 ```
 
-界面构成（信息架构与配色参考 Fairy-DSH 的深色 web 客户端）：
+界面构成（信息架构与配色参考 Fairy-DSH 的深色 web 客户端）：界面预览见[欢迎态](desktop/docs/screenshot.png)与[对话态](desktop/docs/screenshot-conversation.png)。
 
 - **Fairy 形象**：直接复用 Fairy-DSH 的 `fairy-visual` 低层绘图模块（几何、眼睛/光晕 SVG、样式表），**原样再分发、未改动**；由 [`build-mascot.mjs`](desktop/scripts/build-mascot.mjs) 打成一个浏览器可用的 IIFE 挂载。待机动画来自这些模块自带的 CSS 关键帧，不需要上游的 `mascot-runtime.js`。会话开始后 Fairy 从居中缩到右上角。
 - **对话**：流式文本、thinking 折叠块、工具调用卡片（运行中/完成/失败 + 结果）、中断、新会话、切换工作目录、排队与 steering。
-- **命令**：输入 `/` 弹出命令面板，数据来自 `get_commands`，因此本包的 `/fairy-balance`、`/fairy-voice`、`/fairy-persona`、`/fairy-browser` 全部可用。
+- **命令**：输入 `/` 弹出命令面板，数据来自 `get_commands`，因此本包的 `/fairy-balance`、`/fairy-voice`、`/fairy-persona`、`/fairy-browser` 全部可用；名称一律用 pi 返回的原名（与别的包撞名时会显示成 `fairy-voice:2` 这种形式，那个后缀是必须的，原因见验证节）。
 - **扩展 UI**：实现了 `extension_ui_request` 的 `notify` / `setStatus` / `setWidget` / `setTitle` / `set_editor_text` 与四类对话框，扩展的提示能落到界面上。
 - **语音**：右上角「语音」按钮开启后，用 Chromium 的 Web Speech 朗读助手回复（Windows 上即系统语音）；朗读前会剥离 Markdown 与代码块。
 
@@ -115,9 +115,11 @@ npm run test:e2e   # 真开窗口、真发一句话、断言回复与用量
 
 浏览器坞生产者：4 项集成测试真的起两个进程（代理 + 假 MCP）用 JSON-RPC 驱动，覆盖透明转发、任意图片落帧、工具名/参数命中人机验证、`takeover`/`close` 与收场清理；另有 2 项入口测试覆盖 `FAIRY_PI_BROWSER_MCP_ARGS` 的解析与注册。
 
-**桌面端**：先用一个探针脚本确认 `pi --mode rpc` 的握手（`get_state` / `get_commands` / `get_session_stats` 均正常返回、关 stdin 后干净退出），然后对**打包出来的 `Fairy-pi.exe`** 跑了端到端：CDP 把它当用户操作——填输入框、派发提交、轮询界面——断言 11 项全部通过，其中窗口标题为 `Fairy-pi · pi 1.0.4`、模型 chip 显示 `DeepSeek V4 Pro`、用户消息与助手回复都在屏上、`agent_settled` 后运行态回「空闲」、用量累计到 `5,831 tok`。Fairy 形象确实挂载（`[data-dsh-fairy-mascot-root="true"]`），子进程确认为 `node.exe <pi cli.js> --mode rpc`。
+**桌面端**：先用一个探针脚本确认 `pi --mode rpc` 的握手（`get_state` / `get_commands` / `get_session_stats` 均正常返回、关 stdin 后干净退出），然后对**打包出来的 `Fairy-pi.exe`** 跑了端到端：CDP 把它当用户操作——填输入框、派发提交、轮询界面——断言 13 项全部通过（含欢迎态与对话态两张截图落盘），其中窗口标题为 `Fairy-pi · pi 1.0.4`、模型 chip 显示 `DeepSeek V4 Pro`、用户消息与助手回复都在屏上、`agent_settled` 后运行态回「空闲」、用量累计到 `5,835 tok`。Fairy 形象确实挂载（`[data-dsh-fairy-mascot-root="true"]`），子进程确认为 `node.exe <pi cli.js> --mode rpc`。
 
-**桌面端的两个真实缺陷**（都是实机跑出来的，不是推演）：一是 `path.join('F:', 'Users')` 会得到盘符相对的 `F:Users`，导致装在非系统盘时定位不到 pi；二是 PATH 分支多剥了一层目录，把 `agent_data` 丢了。两处都已修，并加了不依赖 Electron 的定位单测。
+**命令名必须原样使用**：`get_commands` 里同名的两个命令，pi 会改名为 `fairy-voice:1` / `fairy-voice:2`（本机实测：`:1` 是旧的 pi-fairy 桌宠包，`:2` 是本包）。这两个后缀名才是可派发的命令——把后缀去掉得到的 `/fairy-voice` 不是命令，pi 会**把它当普通输入交给模型**（实测回包 `disposition: "started"`，模型开始翻目录找这个技能）。所以命令面板与欢迎态 chips 一律显示 `get_commands` 给出的原始名字，不做美化。
+
+**桌面端的三个真实缺陷**（都是实机跑出来的，不是推演）：一是 `path.join('F:', 'Users')` 会得到盘符相对的 `F:Users`，导致装在非系统盘时定位不到 pi；二是 PATH 分支多剥了一层目录，把 `agent_data` 丢了；三是按「去后缀」去重命令名，产出了派发不了的假命令。三处都已修，前两处加了不依赖 Electron 的定位单测，第三处改为一律原样显示；另修掉一个纯视觉问题——空输入框上多余的滚动条。
 
 **一处未在本机验证**：`pi --mode json -p` 这次运行里，扩展注册的 MCP 服务器没有留下连接痕迹（`~/.pi/agent/mcp.log` 不存在，生产者也没启动）。所以我没把「方式二」写成已验证——请用交互式 pi 的 `/mcp` 或 `pi mcp list` 确认；「方式一」的 `mcp.json` 是 Pi 自带 MCP 支持直接读取的路径，可先用 `pi mcp list` 验证条目本身。
 
@@ -165,4 +167,4 @@ Apache-2.0。上游作品来源、被移植/再分发的内容清单、以及**�
 
 值得说明的缺口：上游 `.agent-presets/fairy/runtime/{index.js, fairy_core.py, safety-gate.js}` 在公开仓库中**不存在**，所以语料驱动的检索内核无法移植；本包以「语料随包分发 + 有上界摘要 + 技能按需读取全文」作为可验证的降级方案。
 
-本包不含 [pi-fairy](https://github.com/ymd-physics/pi-fairy) / pi-fairy-win 的任何内容——动画与桌面层由你已安装的那个独立包提供，两者不共享代码。
+本包不含 [pi-fairy](https://github.com/ymd-physics/pi-fairy) / pi-fairy-win 的任何内容——形象绘制复用 Fairy-DSH 的模块，桌面外壳是本包自己的 Electron 外壳，与 pi-fairy 不共享代码。若两者同时装在同一个 pi 上，同名命令会被 pi 改名为 `fairy-voice:1` / `:2`（见上节）；只想留一个时用 `pi remove pi-fairy` 卸掉旧桌宠包。

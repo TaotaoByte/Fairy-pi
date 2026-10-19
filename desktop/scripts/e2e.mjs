@@ -5,6 +5,7 @@
 // the mascot mount and the header stats. No test hooks live in the app itself.
 
 import { spawn } from 'node:child_process';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -74,7 +75,7 @@ function connect(url) {
     socket = ws;
     let nextId = 1;
     const waiters = new Map();
-    ws.addEventListener('open', () => resolve({ evaluate }));
+    ws.addEventListener('open', () => resolve({ evaluate, captureScreenshot }));
     ws.addEventListener('error', () => reject(new Error('CDP 连接失败')));
     ws.addEventListener('message', (event) => {
       let payload;
@@ -90,23 +91,28 @@ function connect(url) {
       }
     });
 
-    function evaluate(expression) {
+    function send(method, params) {
       const id = nextId++;
       return new Promise((resolve) => {
-        waiters.set(id, (payload) => {
-          const result = payload.result && payload.result.result;
-          if (payload.error) resolve({ error: payload.error.message });
-          else if (result && result.exceptionDetails) resolve({ error: result.exceptionDetails.text });
-          else resolve({ value: result ? result.value : undefined });
-        });
-        ws.send(
-          JSON.stringify({
-            id,
-            method: 'Runtime.evaluate',
-            params: { expression, returnByValue: true, awaitPromise: true },
-          }),
-        );
+        waiters.set(id, resolve);
+        ws.send(JSON.stringify({ id, method, params }));
       });
+    }
+
+    async function evaluate(expression) {
+      const payload = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+      const result = payload.result && payload.result.result;
+      if (payload.error) return { error: payload.error.message };
+      if (result && result.exceptionDetails) return { error: result.exceptionDetails.text };
+      return { value: result ? result.value : undefined };
+    }
+
+    async function captureScreenshot(file) {
+      const payload = await send('Page.captureScreenshot', { format: 'png' });
+      const data = payload.result && payload.result.data;
+      if (!data) return false;
+      writeFileSync(file, Buffer.from(data, 'base64'));
+      return true;
     }
   });
 }
@@ -149,6 +155,14 @@ async function main() {
   check('模型信息已填充', Boolean(boot.value && boot.value.model && boot.value.model !== '模型 —'), boot.value && boot.value.model);
   check('无启动错误提示', boot.value && boot.value.errors.length === 0, JSON.stringify(boot.value && boot.value.errors));
 
+  const shotDir = process.env.FAIRY_PI_E2E_SCREENSHOT_DIR;
+  if (shotDir) {
+    mkdirSync(shotDir, { recursive: true });
+    const welcome = path.join(shotDir, 'screenshot.png');
+    const saved = await cdp.captureScreenshot(welcome);
+    check('欢迎态截图已保存', saved, welcome);
+  }
+
   // The submit listener clears the field synchronously inside dispatchEvent,
   // so read the value back before dispatching.
   const submit = await cdp.evaluate(`(() => {
@@ -179,6 +193,12 @@ async function main() {
   check('会话内无错误提示', Boolean(state && state.errors.length === 0), JSON.stringify(state && state.errors));
   check('运行回到空闲', Boolean(state && state.runState === '空闲'), state && state.runState);
   check('已累计 token 用量', Boolean(state && state.tokens !== '0 tok'), state && state.tokens);
+
+  if (shotDir) {
+    const conversation = path.join(shotDir, 'screenshot-conversation.png');
+    const saved = await cdp.captureScreenshot(conversation);
+    check('对话态截图已保存', saved, conversation);
+  }
 }
 
 try {

@@ -195,14 +195,29 @@ function setMascotState(next) {
   if (root) root.setAttribute('data-state', next);
 }
 
+/** Place the fixed mascot over the reserved slot so the welcome copy stays clear. */
+function layoutHero() {
+  if (nodes.fairyStage.classList.contains('docked')) return;
+  const slot = nodes.emptyState.querySelector('.mascot-slot');
+  if (!slot) return;
+  const rect = slot.getBoundingClientRect();
+  if (rect.width === 0) return;
+  nodes.fairyStage.style.left = `${rect.left}px`;
+  nodes.fairyStage.style.top = `${rect.top}px`;
+  nodes.fairyStage.style.width = `${rect.width}px`;
+  nodes.fairyStage.style.height = `${rect.height}px`;
+}
+
 function dockMascot(docked) {
   nodes.fairyStage.classList.toggle('hero', !docked);
   nodes.fairyStage.classList.toggle('docked', docked);
+  if (docked) nodes.fairyStage.style.cssText = '';
+  else layoutHero();
 }
 
 function setCaption(text) {
   nodes.fairyCaption.textContent = text;
-  nodes.fairyStage.classList.toggle('has-caption', Boolean(text) && nodes.fairyStage.classList.contains('hero'));
+  nodes.fairyStage.classList.toggle('has-caption', Boolean(text) && !nodes.fairyStage.classList.contains('docked'));
 }
 
 // ---------------------------------------------------------------------------
@@ -687,12 +702,29 @@ async function refreshStats() {
 async function loadCommands() {
   const result = await command({ type: 'get_commands' });
   if (!result.success || !result.data) return;
-  state.commands = result.data.commands || [];
+  // Names are used verbatim: when two extensions register the same command pi
+  // disambiguates them as `name:1` / `name:2`, and only those exact names are
+  // dispatchable — a stripped `name` is not a command and would be sent to the
+  // model as ordinary prose.
+  const seen = new Map();
+  for (const entry of result.data.commands || []) {
+    if (!entry || !entry.name || seen.has(entry.name)) continue;
+    seen.set(entry.name, entry);
+  }
+  state.commands = [...seen.values()];
   renderEmptyHints();
 }
 
 function renderEmptyHints() {
-  const interesting = state.commands.filter((c) => !c.name.startsWith('skill:')).slice(0, 6);
+  const rank = (entry) => {
+    if (entry.source === 'skill') return 2;
+    if (entry.name.startsWith('fairy')) return 0;
+    return 1;
+  };
+  const interesting = state.commands
+    .slice()
+    .sort((a, b) => rank(a) - rank(b))
+    .slice(0, 6);
   nodes.emptyHints.replaceChildren();
   for (const entry of interesting) {
     const chip = document.createElement('button');
@@ -746,7 +778,10 @@ async function speakLatest() {
 
 function autosize() {
   nodes.input.style.height = 'auto';
-  nodes.input.style.height = `${Math.min(nodes.input.scrollHeight, 190)}px`;
+  const content = nodes.input.scrollHeight;
+  nodes.input.style.height = `${Math.min(content, 190)}px`;
+  // A textarea scrolls by default; only keep the scrollbar once the cap is hit.
+  nodes.input.style.overflowY = content > 190 ? 'auto' : 'hidden';
 }
 
 function updateSlashMenu() {
@@ -865,6 +900,8 @@ function handleStatus(status) {
 
 async function boot() {
   mountMascot();
+  layoutHero();
+  window.addEventListener('resize', layoutHero);
 
   nodes.btnVoice.addEventListener('click', () => {
     state.voice = !state.voice;
@@ -932,11 +969,16 @@ async function boot() {
   api.onRecord(handleRecord);
   api.onStatus(handleStatus);
   api.onStderr((text) => {
+    // pi writes structured lines (JSON or `[fairy-pi] ...` diagnostics) to
+    // stderr. Only genuine errors are worth a toast; warnings such as a missing
+    // optional reference file are logged but suppressed as noise.
     for (const line of String(text).split('\n')) {
-      if (/level":"error"/.test(line) || /"level":"warn"/.test(line)) {
-        const match = line.match(/\{[^]*\}$/);
-        if (match) toast(match[0].slice(0, 300), 'warning');
+      if (!/"level":"error"/.test(line)) {
+        console.warn(line);
+        continue;
       }
+      const match = line.match(/\{[^]*\}$/);
+      reportFailure('pi 报告错误', (match ? match[0] : line).slice(0, 240));
     }
   });
 

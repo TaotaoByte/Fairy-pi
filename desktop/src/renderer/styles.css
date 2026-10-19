@@ -200,7 +200,8 @@ button.primary:hover:not(:disabled) {
   background-clip: content-box;
 }
 
-/* The mascot floats above the transcript and shrinks once a run starts. */
+/* The mascot is fixed so its geometry can animate; in the welcome state its
+   placement is read from .mascot-slot so it never collides with the copy. */
 #fairy-stage {
   position: fixed;
   z-index: 4;
@@ -208,18 +209,6 @@ button.primary:hover:not(:disabled) {
   transition: left 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), top 0.45s cubic-bezier(0.2, 0.8, 0.2, 1),
     width 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), height 0.45s cubic-bezier(0.2, 0.8, 0.2, 1),
     opacity 0.3s ease;
-}
-
-#fairy-stage.hero {
-  left: 50%;
-  top: 38%;
-  width: min(300px, 34vh);
-  height: min(300px, 34vh);
-  transform: translateX(-50%);
-}
-
-#fairy-stage.hero.has-caption {
-  top: 33%;
 }
 
 #fairy-stage.docked {
@@ -263,9 +252,22 @@ button.primary:hover:not(:disabled) {
 #empty-state {
   position: relative;
   z-index: 3;
-  padding: 14vh 8vw 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 9vh 8vw 0;
   text-align: center;
   pointer-events: none;
+}
+
+/* Reserves the welcome mascot's footprint; the fixed #fairy-stage is aligned
+   to this box by the renderer, so the copy can never end up underneath. */
+.mascot-slot {
+  width: min(300px, 34vh);
+  height: min(300px, 34vh);
+  flex: none;
+  margin-bottom: 26px;
 }
 
 #empty-state.hidden {
@@ -273,7 +275,7 @@ button.primary:hover:not(:disabled) {
 }
 
 #empty-state h1 {
-  margin: 0 0 10px;
+  margin: 0;
   font-size: 34px;
   letter-spacing: 0.14em;
   font-weight: 600;
@@ -298,7 +300,6 @@ button.primary:hover:not(:disabled) {
 }
 
 #empty-hints {
-  margin-top: 22px;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;

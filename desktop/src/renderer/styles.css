@@ -186,15 +186,115 @@ body {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: 264px minmax(0, 1fr);
+  grid-template-columns: 232px minmax(0, 1fr);
+  grid-template-rows: 36px minmax(0, 1fr);
   height: 100%;
+}
+
+/* The window is frameless, so this strip is both the drag handle and the
+   place where the reference client shows its URL pill. */
+.titlebar {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--border-2);
+  background: color-mix(in srgb, var(--bg-base) 92%, transparent);
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.win-buttons {
+  display: flex;
+  gap: 4px;
+  -webkit-app-region: no-drag;
+}
+
+.win-btn {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--label-2);
+  cursor: pointer;
+}
+
+.win-btn .ico {
+  width: 12px;
+  height: 12px;
+  stroke-width: 1.6;
+}
+
+.win-btn:hover {
+  background: var(--nav-hover);
+  color: var(--label-1);
+}
+
+.win-btn.danger:hover {
+  background: var(--err);
+  color: #fff;
+}
+
+.titlebar-pill {
+  flex: 1;
+  min-width: 0;
+  max-width: 460px;
+  margin: 0 auto;
+  padding: 3px 14px;
+  border: 1px solid var(--border-2);
+  border-radius: 999px;
+  background: var(--input);
+  color: var(--label-3);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;
+}
+
+.titlebar-right {
+  display: flex;
+  gap: 4px;
+  -webkit-app-region: no-drag;
 }
 
 /* ---------------------------------------------------------------- sidebar */
 
 #sidebar {
   position: relative;
+  grid-column: 1;
+  grid-row: 2;
   min-width: 0;
+}
+
+#app.collapsed {
+  grid-template-columns: 58px minmax(0, 1fr);
+}
+
+#app.collapsed .brand-copy,
+#app.collapsed .sidebar-new span,
+#app.collapsed .ws-head,
+#app.collapsed .ws-tree,
+#app.collapsed .balance-card,
+#app.collapsed .side-row span {
+  display: none;
+}
+
+#app.collapsed .brand {
+  justify-content: center;
+}
+
+#app.collapsed .sidebar-new,
+#app.collapsed .side-row {
+  justify-content: center;
 }
 
 /* The board is a matte polymer sheet with a moulded ridge on its right edge,
@@ -231,8 +331,12 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 4px 6px 12px;
+  padding: 2px 2px 12px;
   user-select: none;
+}
+
+.brand-toggle {
+  margin-left: auto;
 }
 
 /* The Fairy eye mark: ring + four brows, straight from the DSH brand mark. */
@@ -323,48 +427,122 @@ body {
   border-color: transparent;
 }
 
-#nav {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.nav-item {
+/* Workspace section: header plus the session tree, mirroring the reference
+   client's sidebar, where the sidebar lists sessions rather than features. */
+.ws-head {
   display: flex;
   align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 8px 11px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--label-2);
-  font-family: inherit;
-  font-size: 13.5px;
-  text-align: left;
-  cursor: pointer;
+  gap: 6px;
+  padding: 2px 4px 6px;
 }
 
-.nav-item:hover {
+.ws-title {
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+  color: var(--label-3);
+}
+
+.ws-head .icon-btn.tiny {
+  width: 22px;
+  height: 22px;
+}
+
+.ws-head .icon-btn.tiny:first-of-type {
+  margin-left: auto;
+}
+
+.ws-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding-right: 2px;
+}
+
+.ws-tree::-webkit-scrollbar {
+  width: 0;
+}
+
+.ws-group {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 7px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--label-2);
+  font-family: var(--mono);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+}
+
+.ws-group:hover {
   background: var(--nav-hover);
   color: var(--label-1);
 }
 
-.nav-item[aria-current="page"] {
+.ws-group .ico {
+  width: 14px;
+  height: 14px;
+  color: var(--icon-1);
+  opacity: 0.8;
+}
+
+.ws-group-count {
+  margin-left: auto;
+  font-size: 10.5px;
+  color: var(--label-3);
+}
+
+.ws-session {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 8px 5px 22px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--label-2);
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ws-session:hover {
+  background: var(--nav-hover);
+  color: var(--label-1);
+}
+
+.ws-session[aria-current="true"] {
   background: var(--nav-active);
   color: var(--label-1);
   box-shadow: inset 2px 0 0 var(--nav-accent);
 }
 
-.nav-item .ico {
-  color: var(--icon-1);
-  opacity: 0.85;
+.ws-session-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.nav-badge {
+.ws-session-time {
   margin-left: auto;
+  flex: none;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 10.5px;
+  color: var(--label-3);
+}
+
+.ws-empty {
+  padding: 6px 8px;
+  font-size: 12px;
   color: var(--label-3);
 }
 
@@ -376,15 +554,14 @@ body {
 /* Sidebar footer balance card, matching DSH's `sidebar.footer.action` slot. */
 .balance-card {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) max-content;
-  gap: 2px 8px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 3px 8px;
   width: 100%;
-  padding: 8px 11px;
+  padding: 9px 11px;
   border-radius: 8px;
   border: 1px solid var(--border-2);
   background: var(--bg-1);
   color: var(--label-2);
-  font-size: 12px;
   text-align: left;
   cursor: pointer;
 }
@@ -393,35 +570,66 @@ body {
   border-color: var(--brand);
 }
 
-.balance-row {
-  display: contents;
+.balance-cell {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
 }
 
 .balance-label {
+  flex: none;
+  font-size: 10px;
   color: var(--label-3);
   white-space: nowrap;
 }
 
 .balance-value {
-  justify-self: end;
+  min-width: 0;
+  margin-left: auto;
   font-family: var(--mono);
+  font-size: 10.5px;
   color: var(--label-1);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sidebar-foot {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 10px;
+  margin-top: 8px;
   padding: 0 2px;
+}
+
+.side-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--label-2);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.side-row:hover {
+  background: var(--nav-hover);
+  color: var(--label-1);
 }
 
 .run-state {
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: 11px;
   color: var(--label-3);
   margin-right: auto;
+  white-space: nowrap;
 }
 
 .run-state.busy { color: var(--accent-soft); }
@@ -462,81 +670,108 @@ body {
   align-items: center;
   gap: 12px;
   flex: none;
-  padding: 9px 16px;
+  padding: 7px 14px;
   border-bottom: 1px solid var(--border-2);
   background: color-mix(in srgb, var(--bg-base) 72%, transparent);
   backdrop-filter: blur(10px);
 }
 
-.topbar-title {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  min-width: 0;
-}
-
-.topbar-title h1 {
-  margin: 0;
-  font-family: var(--display);
-  font-size: 16px;
-  font-weight: 750;
-  letter-spacing: 0.06em;
-}
-
-.topbar-sub {
-  font-family: var(--mono);
-  font-size: 11.5px;
-  color: var(--label-3);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.topbar-meta {
+/* Reference layout: the session name sits left of a row of view tabs. */
+.topbar-left {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 14px;
   flex: 1;
   min-width: 0;
 }
 
-.topbar-stats {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-family: var(--mono);
-  font-size: 12px;
-  color: var(--label-2);
+.session-title {
+  font-family: var(--display);
+  font-size: 13.5px;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  max-width: 22ch;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.chip {
-  display: inline-flex;
+.tabs {
+  display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border: 1px solid var(--border-2);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--bg-1) 80%, transparent);
-  color: var(--label-2);
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.tab {
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--label-3);
   font-family: inherit;
-  font-size: 12px;
+  font-size: 12.5px;
   white-space: nowrap;
   cursor: pointer;
 }
 
-.chip:hover {
-  border-color: var(--brand);
+.tab:hover {
+  background: var(--nav-hover);
   color: var(--label-1);
 }
 
-.chip-path {
-  max-width: 34ch;
+.tab[aria-selected="true"] {
+  background: var(--nav-active);
+  color: var(--label-1);
+  box-shadow: inset 0 -2px 0 var(--nav-accent);
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.topbar-right .icon-btn {
+  width: 28px;
+  height: 28px;
+  border-color: var(--border-2);
+}
+
+.pill-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 24ch;
+  padding: 4px 9px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--label-3);
+  font-family: inherit;
+  font-size: 11.5px;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  direction: rtl;
-  text-align: left;
-  font-family: var(--mono);
-  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.pill-chip:hover {
+  background: var(--nav-hover);
+  color: var(--label-1);
+}
+
+.pill-chip .ico {
+  width: 13px;
+  height: 13px;
 }
 
 .stat {
@@ -544,12 +779,10 @@ body {
   border-radius: 6px;
   border: 1px solid var(--border-2);
   background: color-mix(in srgb, var(--bg-1) 70%, transparent);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--label-2);
   white-space: nowrap;
-}
-
-.topbar-actions {
-  display: flex;
-  gap: 6px;
 }
 
 button {
@@ -949,24 +1182,15 @@ button.primary:hover:not(:disabled) {
   scrollbar-color: var(--scroll) transparent;
 }
 
-/* The mascot is fixed so its geometry can animate; in the welcome state its
-   placement is read from .mascot-slot so it never collides with the copy. */
+/* The mascot is a fixed backdrop layer, the way the reference client keeps it
+   large and centred while the transcript scrolls underneath it. */
 #fairy-stage {
   position: fixed;
-  z-index: 4;
+  z-index: 1;
   pointer-events: none;
-  transition: left 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), top 0.45s cubic-bezier(0.2, 0.8, 0.2, 1),
-    width 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), height 0.45s cubic-bezier(0.2, 0.8, 0.2, 1),
+  transition: left 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), top 0.4s cubic-bezier(0.2, 0.8, 0.2, 1),
+    width 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), height 0.4s cubic-bezier(0.2, 0.8, 0.2, 1),
     opacity 0.3s ease;
-}
-
-#fairy-stage.docked {
-  left: auto;
-  right: 26px;
-  top: 64px;
-  width: calc(96px * var(--mascot-scale, 1));
-  height: calc(96px * var(--mascot-scale, 1));
-  transform: none;
 }
 
 /* The vendored stylesheet keys the light halo to DSH's own theme attribute. */
@@ -1010,62 +1234,16 @@ button.primary:hover:not(:disabled) {
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  padding: 8vh 6vw 0;
+  /* The mascot is a fixed backdrop; this reserves its zone so the copy sits
+     below it instead of on top of it. */
+  padding: var(--mascot-zone, 260px) 6vw 0;
   text-align: center;
   pointer-events: none;
-}
-
-/* Reserves the welcome mascot's footprint; the fixed #fairy-stage is aligned
-   to this box by the renderer, so the copy can never end up underneath. */
-.mascot-slot {
-  width: calc(min(300px, 32vh) * var(--mascot-scale, 1));
-  height: calc(min(300px, 32vh) * var(--mascot-scale, 1));
-  flex: none;
-  margin: 22px 0;
 }
 
 #empty-state.hidden {
   display: none;
 }
-
-/* The hero title and its side-ruled subtitle come from Fairy-DSH's hero. */
-.hero-title {
-  margin: 0;
-  font-family: var(--display);
-  font-size: 52px;
-  font-weight: 750;
-  line-height: 1;
-  letter-spacing: 0;
-  color: var(--label-1);
-}
-
-.hero-sub {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 44px;
-  margin: 8px 0 0;
-  color: var(--label-2);
-  font-family: var(--mono);
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.16em;
-}
-
-.hero-sub::before,
-.hero-sub::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  width: 240px;
-  height: 1px;
-  background: currentColor;
-  opacity: 0.45;
-  transform: translateY(-50%);
-}
-
-.hero-sub::before { right: calc(100% + 12px); }
-.hero-sub::after { left: calc(100% + 12px); }
 
 .empty-sub {
   margin: 0 auto;
@@ -1108,12 +1286,22 @@ button.primary:hover:not(:disabled) {
 #messages {
   position: relative;
   z-index: 2;
-  max-width: 820px;
+  max-width: 760px;
   margin: 0 auto;
-  padding: 22px 20px 150px;
+  padding: 12px 24px 130px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+/* Only the transcript reserves the mascot zone; the empty state already does,
+   and doubling it would make the welcome page scroll and drag the copy up. */
+#messages.has-content {
+  padding-top: var(--mascot-zone, 250px);
+}
+
+#messages:empty {
+  padding: 0;
 }
 
 #messages.has-content ~ #empty-state {
@@ -1121,11 +1309,55 @@ button.primary:hover:not(:disabled) {
 }
 
 .msg {
-  border-radius: var(--radius);
-  border: 1px solid var(--border-2);
-  background: color-mix(in srgb, var(--bg-1) 80%, transparent);
-  padding: 12px 15px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   animation: rise 0.24s ease both;
+}
+
+/* The reference client floats turns on the background instead of boxing them:
+   the user gets a soft bubble, the assistant plain text. */
+.msg-user {
+  align-self: flex-end;
+  max-width: 78%;
+  padding: 9px 14px;
+  border: 1px solid var(--border-2);
+  border-radius: 16px;
+  background: var(--bubble);
+}
+
+.msg-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.msg:hover .msg-actions {
+  opacity: 1;
+}
+
+.msg-user .msg-actions {
+  justify-content: flex-end;
+}
+
+.msg-action {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--label-3);
+  cursor: pointer;
+}
+
+.msg-action:hover {
+  background: var(--nav-hover);
+  color: var(--label-1);
 }
 
 @keyframes rise {
@@ -1135,29 +1367,13 @@ button.primary:hover:not(:disabled) {
   }
 }
 
-.msg-user {
-  background: color-mix(in srgb, var(--bubble) 78%, transparent);
-  border-color: var(--border-1);
-}
-
-.msg-head {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin-bottom: 6px;
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+.msg-system {
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg-2) 50%, transparent);
   color: var(--label-3);
-}
-
-.msg-role {
-  color: var(--label-2);
-}
-
-.msg-time {
-  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 12px;
 }
 
 .msg-body {
@@ -1238,27 +1454,43 @@ button.primary:hover:not(:disabled) {
   }
 }
 
+/* Flat "Think" / "上下文注入" rows, as in the reference client. */
 .thinking {
-  border: 1px dashed var(--border-2);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--bg-2) 45%, transparent);
   margin: 6px 0;
-  padding: 6px 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--label-3);
   font-size: 12.5px;
 }
 
 .thinking summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
   cursor: pointer;
-  font-family: var(--mono);
-  font-size: 11.5px;
-  letter-spacing: 0.08em;
   color: var(--label-3);
   list-style: none;
 }
 
+.thinking summary .ico {
+  width: 14px;
+  height: 14px;
+}
+
+.thinking summary::-webkit-details-marker {
+  display: none;
+}
+
 .thinking[open] summary {
-  margin-bottom: 6px;
+  margin-bottom: 5px;
+  color: var(--label-2);
+}
+
+.thinking > div {
+  padding-left: 21px;
+  color: var(--label-3);
+  line-height: 1.65;
 }
 
 .tool {
@@ -1353,30 +1585,77 @@ button.primary:hover:not(:disabled) {
 #composer {
   position: relative;
   flex: none;
-  padding: 10px 20px 12px;
-  border-top: 1px solid var(--border-1);
-  background: color-mix(in srgb, var(--bg-base) 88%, transparent);
+  padding: 8px 20px 8px;
+  border-top: 1px solid var(--border-2);
+  background: color-mix(in srgb, var(--bg-base) 90%, transparent);
   backdrop-filter: blur(10px);
   z-index: 2;
 }
 
-.composer-row {
+/* One rounded container holding the workspace chip, the field and the model
+   selector, matching the reference composer. */
+.composer-pill {
   display: flex;
-  gap: 10px;
   align-items: flex-end;
-  max-width: 820px;
+  gap: 6px;
+  max-width: 760px;
   margin: 0 auto;
+  padding: 5px 6px 5px 10px;
+  border: 1px solid var(--border-1);
+  border-radius: 22px;
+  background: var(--input);
+}
+
+.pill-left,
+.pill-right {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+  padding-bottom: 3px;
+}
+
+.send-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--btn-fill);
+  color: #f2f8ff;
+  cursor: pointer;
+}
+
+.send-btn:hover:not(:disabled) {
+  background: var(--btn-hover);
+}
+
+.send-btn .ico {
+  width: 15px;
+  height: 15px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 #input {
   flex: 1;
+  min-width: 0;
   resize: none;
-  min-height: 42px;
-  max-height: 190px;
-  padding: 10px 13px;
-  border-radius: var(--radius);
-  border: 1px solid var(--border-1);
-  background: var(--input);
+  min-height: 30px;
+  max-height: 180px;
+  padding: 7px 4px;
+  border: 0;
+  background: transparent;
   color: var(--label-1);
   font-family: inherit;
   font-size: 14px;
@@ -1386,8 +1665,7 @@ button.primary:hover:not(:disabled) {
 }
 
 #input:focus {
-  border-color: var(--brand);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 22%, transparent);
+  outline: none;
 }
 
 #input:disabled {
@@ -1560,17 +1838,7 @@ button.primary:hover:not(:disabled) {
   }
 
   .brand-sub,
-  .chip-path,
-  .topbar-stats {
+  .stat {
     display: none;
-  }
-
-  .hero-title {
-    font-size: 34px;
-  }
-
-  .hero-sub::before,
-  .hero-sub::after {
-    width: 84px;
   }
 }

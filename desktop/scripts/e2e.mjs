@@ -131,9 +131,20 @@ const readState = `(() => {
     cost: document.getElementById('stat-cost').innerText,
     runState: document.getElementById('run-state').innerText,
     title: document.title,
-    navItems: Array.from(document.querySelectorAll('#nav .nav-item')).map((b) => b.dataset.page),
+    navItems: Array.from(document.querySelectorAll('#tabs .tab')).map((b) => b.dataset.page),
+    activeTab: (document.querySelector('#tabs .tab[aria-selected="true"]') || {}).textContent || null,
     activePage: (document.querySelector('#pages .page.active') || {}).dataset?.page || null,
-    pageTitle: document.getElementById('page-title').innerText,
+    pageTitle: document.getElementById('session-title').innerText,
+    titlebarPill: document.getElementById('titlebar-pill').innerText,
+    wsGroups: document.querySelectorAll('#ws-tree .ws-group').length,
+    wsSessions: document.querySelectorAll('#ws-tree .ws-session').length,
+    mascotBox: (() => {
+      const el = document.getElementById('fairy-stage');
+      const r = el.getBoundingClientRect();
+      return { top: Math.round(r.top), bottom: Math.round(r.bottom), height: Math.round(r.height) };
+    })(),
+    copyTop: Math.round(document.querySelector('#empty-state .empty-sub').getBoundingClientRect().top),
+    mascotZone: getComputedStyle(document.getElementById('stage')).getPropertyValue('--mascot-zone').trim(),
     sideBalance: document.getElementById('side-balance').innerText,
     sideToday: document.getElementById('side-today').innerText,
     modelMenuOpen: !document.getElementById('model-menu').hidden,
@@ -168,8 +179,15 @@ async function main() {
   if (shotDir) mkdirSync(shotDir, { recursive: true });
 
   // --- shell: sidebar navigation, pages and the model menu ---------------
-  check('侧边栏有 7 个导航项', boot.value.navItems.length === 7, JSON.stringify(boot.value.navItems));
+  check('顶部有 7 个标签页', boot.value.navItems.length === 7, JSON.stringify(boot.value.navItems));
   check('默认停在对话页', boot.value.activePage === 'chat', boot.value.activePage);
+  check('侧边栏列出了工作区', boot.value.wsGroups > 0, `groups=${boot.value.wsGroups} sessions=${boot.value.wsSessions}`);
+  check('标题栏显示会话与目录', Boolean(boot.value.titlebarPill && boot.value.titlebarPill.length > 3), boot.value.titlebarPill);
+  check(
+    '欢迎态文案不与形象重叠',
+    boot.value.copyTop >= boot.value.mascotBox.bottom,
+    `copyTop=${boot.value.copyTop} mascot=${JSON.stringify(boot.value.mascotBox)} zone=${boot.value.mascotZone}`,
+  );
 
   // The sidebar balance card is filled by running /fairy-balance once at boot.
   let balance = '—';
@@ -189,7 +207,7 @@ async function main() {
     check('欢迎态截图已保存', saved, welcome);
   }
 
-  await cdp.evaluate(`document.querySelector('#nav .nav-item[data-page="balance"]').click()`);
+  await cdp.evaluate(`document.querySelector('#tabs .tab[data-page="balance"]').click()`);
   await sleep(1200);
   const balancePage = await cdp.evaluate(readState);
   check('点「余额」切到余额页', balancePage.value.activePage === 'balance', balancePage.value.activePage);
@@ -199,11 +217,11 @@ async function main() {
     check('余额页截图已保存', saved);
   }
 
-  await cdp.evaluate(`document.querySelector('#nav .nav-item[data-page="settings"]').click()`);
+  await cdp.evaluate(`document.querySelector('#tabs .tab[data-page="settings"]').click()`);
   await sleep(1200);
   const settings = await cdp.evaluate(readState);
   check('点「设置」切到设置页', settings.value.activePage === 'settings', settings.value.activePage);
-  check('页面标题跟着切', settings.value.pageTitle === '设置', settings.value.pageTitle);
+  check('高亮跟着切到设置', settings.value.activeTab === '设置', settings.value.activeTab);
   check('设置页列出了模型', settings.value.settingsModels > 1, String(settings.value.settingsModels));
   check('模型下拉选中当前模型', /deepseek/.test(settings.value.modelSelectValue || ''), settings.value.modelSelectValue);
   if (shotDir) {
@@ -242,7 +260,7 @@ async function main() {
   const closed = await cdp.evaluate(readState);
   check('Esc 关闭模型菜单', closed.value.modelMenuOpen === false);
 
-  await cdp.evaluate(`document.querySelector('#nav .nav-item[data-page="chat"]').click()`);
+  await cdp.evaluate(`document.querySelector('#tabs .tab[data-page="chat"]').click()`);
   await sleep(500);
   const back = await cdp.evaluate(readState);
   check('能切回对话页', back.value.activePage === 'chat', back.value.activePage);

@@ -62,12 +62,41 @@
         <path d="M4 7a2 2 0 0 1 2-2h3l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" />
       </symbol>
       <symbol id="i-send" viewBox="0 0 24 24">
-        <path d="M4 12l16-8-6 16-3-6z" />
+        <path d="M12 19V5" />
+        <path d="M6 11l6-6 6 6" />
       </symbol>
-      <symbol id="i-link" viewBox="0 0 24 24">
-        <path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1" />
-        <path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1" />
+      <symbol id="i-panel" viewBox="0 0 24 24">
+        <rect x="3" y="4" width="18" height="16" rx="2" />
+        <path d="M9 4v16" />
       </symbol>
+      <symbol id="i-search" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="6" />
+        <path d="M20 20l-4.2-4.2" />
+      </symbol>
+      <symbol id="i-sort" viewBox="0 0 24 24">
+        <path d="M4 7h11M4 12h8M4 17h5" />
+      </symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24">
+        <rect x="9" y="9" width="11" height="11" rx="2" />
+        <path d="M15 6.5A2.5 2.5 0 0 0 12.5 4H6a2 2 0 0 0-2 2v6.5A2.5 2.5 0 0 0 6.5 15" />
+      </symbol>
+      <symbol id="i-retry" viewBox="0 0 24 24">
+        <path d="M4 12a8 8 0 1 0 2.3-5.6" />
+        <path d="M4 4v5h5" />
+      </symbol>
+      <symbol id="i-more" viewBox="0 0 24 24">
+        <circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" />
+      </symbol>
+      <symbol id="i-inject" viewBox="0 0 24 24">
+        <path d="M4 6h16M4 12h10M4 18h13" />
+      </symbol>
+      <symbol id="i-think" viewBox="0 0 24 24">
+        <path d="M12 3a6 6 0 0 0-3.5 10.9V17h7v-3.1A6 6 0 0 0 12 3z" />
+        <path d="M9.5 20h5" />
+      </symbol>
+      <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></symbol>
+      <symbol id="i-min" viewBox="0 0 24 24"><path d="M6 12h12" /></symbol>
+      <symbol id="i-max" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5" /></symbol>
     </svg>
 
     <div class="hdd-fx" aria-hidden="true">
@@ -77,6 +106,26 @@
     </div>
 
     <div id="app">
+      <header class="titlebar" id="titlebar">
+        <div class="win-buttons">
+          <button type="button" class="win-btn" data-window="minimize" title="最小化">
+            <svg class="ico" aria-hidden="true"><use href="#i-min" /></svg>
+          </button>
+          <button type="button" class="win-btn" data-window="maximize" title="最大化 / 还原">
+            <svg class="ico" aria-hidden="true"><use href="#i-max" /></svg>
+          </button>
+          <button type="button" class="win-btn danger" data-window="close" title="关闭">
+            <svg class="ico" aria-hidden="true"><use href="#i-close" /></svg>
+          </button>
+        </div>
+        <div class="titlebar-pill" id="titlebar-pill" title="当前会话与工作目录">Fairy-pi</div>
+        <div class="titlebar-right">
+          <button type="button" class="icon-btn" id="btn-win-voice" title="朗读助手回复">
+            <svg class="ico" aria-hidden="true"><use href="#i-voice" /></svg>
+          </button>
+        </div>
+      </header>
+
       <aside id="sidebar">
         <div class="sidebar-board">
           <div class="brand" id="brand">
@@ -87,9 +136,12 @@
               <i class="brow" data-side="left"></i>
             </span>
             <span class="brand-copy">
-              <span class="brand-title">Fairy-pi</span>
+              <span class="brand-title">Fairy</span>
               <span class="brand-sub">PI DESKTOP CLIENT</span>
             </span>
+            <button type="button" class="icon-btn brand-toggle" id="btn-sidebar-toggle" title="收起侧边栏">
+              <svg class="ico" aria-hidden="true"><use href="#i-panel" /></svg>
+            </button>
           </div>
 
           <button type="button" class="sidebar-new" id="btn-new-session">
@@ -97,32 +149,43 @@
             <span>新会话</span>
           </button>
 
-          <nav id="nav" aria-label="主导航"></nav>
+          <div class="ws-head">
+            <span class="ws-title">工作区</span>
+            <button type="button" class="icon-btn tiny" id="btn-ws-search" title="刷新会话列表">
+              <svg class="ico" aria-hidden="true"><use href="#i-refresh" /></svg>
+            </button>
+          </div>
+
+          <nav id="ws-tree" class="ws-tree" aria-label="会话列表"></nav>
 
           <div class="sidebar-spacer"></div>
 
           <button type="button" class="balance-card" id="balance-card" title="DeepSeek 余额与今日用量">
-            <span class="balance-row">
+            <span class="balance-cell">
               <span class="balance-label">余额</span>
               <span class="balance-value" id="side-balance">—</span>
             </span>
-            <span class="balance-row">
+            <span class="balance-cell">
               <span class="balance-label">今日token</span>
               <span class="balance-value" id="side-today">—</span>
             </span>
-            <span class="balance-row balance-row-wide">
+            <span class="balance-cell">
               <span class="balance-label">今日估算</span>
               <span class="balance-value" id="side-cost">—</span>
+            </span>
+            <span class="balance-cell">
+              <span class="balance-label">档位</span>
+              <span class="balance-value" id="side-band">—</span>
             </span>
           </button>
 
           <div class="sidebar-foot">
-            <span id="run-state" class="run-state idle">未连接</span>
+            <button type="button" class="side-row" id="btn-goto-settings">
+              <svg class="ico" aria-hidden="true"><use href="#i-settings" /></svg>
+              <span>设置</span>
+            </button>
             <button type="button" class="icon-btn" id="btn-theme" title="切换明暗主题">
               <svg class="ico" aria-hidden="true"><use href="#i-moon" /></svg>
-            </button>
-            <button type="button" class="icon-btn" id="btn-goto-settings" title="设置">
-              <svg class="ico" aria-hidden="true"><use href="#i-settings" /></svg>
             </button>
           </div>
         </div>
@@ -130,30 +193,23 @@
 
       <div id="workspace">
         <header class="topbar">
-          <div class="topbar-title">
-            <h1 id="page-title">对话</h1>
-            <span class="topbar-sub" id="page-sub"></span>
+          <div class="topbar-left">
+            <span class="session-title" id="session-title">未命名会话</span>
+            <nav id="tabs" class="tabs" aria-label="视图"></nav>
           </div>
-
-          <div class="topbar-meta">
-            <button type="button" class="chip chip-model" id="chip-model" aria-haspopup="menu" aria-expanded="false" title="切换模型">
-              <span id="chip-model-name">模型 —</span>
-              <svg class="ico" aria-hidden="true"><use href="#i-chevron" /></svg>
-            </button>
-            <button type="button" class="chip chip-path" id="chip-cwd" title="pi 的工作目录">目录 —</button>
-          </div>
-
-          <div class="topbar-stats">
+          <div class="topbar-right">
             <span class="stat" id="stat-tokens" title="本会话 token 用量">0 tok</span>
             <span class="stat" id="stat-cost" title="本会话累计成本（估算）">$0.0000</span>
             <span class="stat" id="stat-context" title="上下文占用">0%</span>
-          </div>
-
-          <div class="topbar-actions">
-            <button type="button" id="btn-voice" class="ghost" aria-pressed="false" title="朗读助手回复">语音</button>
-            <button type="button" id="btn-workdir" class="ghost" title="切换工作目录（会重启 pi）">目录</button>
-            <button type="button" id="btn-new" class="ghost" title="开始新会话">新会话</button>
-            <button type="button" id="btn-abort" class="ghost" title="中断当前运行">中断</button>
+            <button type="button" id="btn-workdir" class="icon-btn" title="切换工作目录（会重启 pi）">
+              <svg class="ico" aria-hidden="true"><use href="#i-folder" /></svg>
+            </button>
+            <button type="button" id="btn-new" class="icon-btn" title="开始新会话">
+              <svg class="ico" aria-hidden="true"><use href="#i-plus" /></svg>
+            </button>
+            <button type="button" id="btn-abort" class="icon-btn" title="中断当前运行">
+              <svg class="ico" aria-hidden="true"><use href="#i-stop" /></svg>
+            </button>
           </div>
         </header>
 
@@ -167,9 +223,6 @@
                 <div id="fairy-caption">Fairy 待机中</div>
               </div>
               <section id="empty-state">
-                <h1 class="hero-title">Fairy-pi</h1>
-                <p class="hero-sub"><span>PI DESKTOP</span></p>
-                <div class="mascot-slot" aria-hidden="true"></div>
                 <p class="empty-sub">
                   <code>Enter</code> 发送，<code>Shift</code>+<code>Enter</code> 换行，输入 <code>/</code> 查看命令。
                 </p>
@@ -181,15 +234,28 @@
             <div id="statusbar"></div>
             <form id="composer" autocomplete="off">
               <div id="slash-menu" hidden></div>
-              <div class="composer-row">
-                <textarea id="input" rows="1" placeholder="给 pi 说点什么…" spellcheck="false"></textarea>
-                <button type="submit" id="btn-send" class="primary" title="发送">
-                  <svg class="ico" aria-hidden="true"><use href="#i-send" /></svg>
-                  <span id="btn-send-label">发送</span>
-                </button>
+              <div class="composer-pill">
+                <div class="pill-left">
+                  <button type="button" class="pill-chip" id="pill-cwd" title="工作目录">
+                    <svg class="ico" aria-hidden="true"><use href="#i-folder" /></svg>
+                    <span id="pill-cwd-label">—</span>
+                  </button>
+                </div>
+                <textarea id="input" rows="1" placeholder="拜托了，艾莲大人！" spellcheck="false"></textarea>
+                <div class="pill-right">
+                  <button type="button" class="pill-chip" id="chip-model" aria-haspopup="menu" aria-expanded="false" title="切换模型">
+                    <span id="chip-model-name">模型 —</span>
+                    <svg class="ico" aria-hidden="true"><use href="#i-chevron" /></svg>
+                  </button>
+                  <button type="submit" id="btn-send" class="send-btn" title="发送">
+                    <svg class="ico" aria-hidden="true"><use href="#i-send" /></svg>
+                    <span id="btn-send-label" class="sr-only">发送</span>
+                  </button>
+                </div>
               </div>
               <div class="composer-foot">
                 <span id="queue" class="queue"></span>
+                <span id="run-state" class="run-state idle">未连接</span>
               </div>
             </form>
           </section>

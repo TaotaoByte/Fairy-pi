@@ -12,10 +12,11 @@
 
 const { app, BrowserWindow, Menu, dialog, ipcMain, shell } = require('electron');
 const { spawn } = require('node:child_process');
+const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { IS_WINDOWS, resolvePi, resolveNode } = require('./pi-locate.cjs');
+const { IS_WINDOWS, resolveAgentDir, resolvePi, resolveNode } = require('./pi-locate.cjs');
 
 // ---------------------------------------------------------------------------
 // Bridge
@@ -164,7 +165,9 @@ function createWindow() {
     show: false,
     backgroundColor: '#0a0e1a',
     title: 'Fairy-pi',
-    autoHideMenuBar: true,
+    // The reference client draws its own chrome (window buttons + a URL strip),
+    // so the OS frame is off and the renderer supplies the title bar.
+    frame: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -200,6 +203,98 @@ function createWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+}
+
+// ---------------------------------------------------------------------------
+// Session index (for the workspace tree in the sidebar)
+// ---------------------------------------------------------------------------
+
+/**
+ * pi keeps one directory per working directory under `<agent_data>/sessions`,
+ * each holding `<timestamp>_<id>.jsonl` transcripts. There is no RPC command
+ * that lists them, so the main process reads the headers directly; the
+ * renderer only ever sees the small summary objects.
+ */
+function listSessions(limit = 80) {
+  const agentDir = resolveAgentDir();
+  if (!agentDir) return [];
+  const root = path.join(agentDir, 'sessions');
+
+  let groups = [];
+  try {
+    groups = fs.readdirSync(root, { withFileTypes: true }).filter((entry) => entry.isDirectory());
+  } catch {
+    return [];
+  }
+
+  const sessions = [];
+  for (const group of groups) {
+    const dir = path.join(root, group.name);
+    let files = [];
+    try {
+      files = fs.readdirSync(dir).filter((name) => name.endsWith('.jsonl'));
+    } catch {
+      continue;
+    }
+    // Only the newest few per working directory: older ones cannot be reached
+    // faster than they can be read anyway, and the tree stays legible.
+    files.sort().reverse().slice(0, 25);
+
+    for (const name of files) {
+      const file = path.join(dir, name);
+      let stat;
+      try {
+        stat = fs.statSync(file);
+      } catch {
+        continue;
+      }
+
+      let text = '';
+      try {
+        text = fs.readFileSync(file, 'utf8');
+      } catch {
+        /* unreadable session; still list it by filename */
+      }
+
+      let cwd = '';
+      let id = '';
+      let title = '';
+      for (const line of text.split('\n')) {
+        if (!line.trim()) continue;
+        let record;
+        try {
+          record = JSON.parse(line);
+        } catch {
+          continue;
+        }
+        if (record.type === 'session') {
+          cwd = record.cwd || '';
+          id = record.id || '';
+        } else if (record.type === 'session_name' && record.name) {
+          title = String(record.name);
+        } else if (!title && record.type === 'message' && record.message && record.message.role === 'user') {
+          const content = record.message.content;
+          const text = typeof content === 'string'
+            ? content
+            : Array.isArray(content)
+              ? content.filter((block) => block && block.type === 'text').map((block) => block.text || '').join('')
+              : '';
+          if (text.trim()) title = text.trim().replace(/\s+/g, ' ').slice(0, 48);
+        }
+      }
+
+      sessions.push({
+        path: file,
+        id,
+        cwd,
+        title: title || id || name.replace(/\.jsonl$/, ''),
+        mtime: stat.mtimeMs,
+      });
+    }
+  }
+
+  sessions.sort((a, b) => b.mtime - a.mtime);
+  return sessions.slice(0, limit);
 }
 
 app.whenReady().then(() => {
@@ -246,6 +341,18 @@ app.whenReady().then(() => {
 
   ipcMain.handle('pi:reveal', (_event, target) => {
     if (typeof target === 'string' && target) shell.showItemInFolder(target);
+  });
+
+  ipcMain.handle('pi:sessions', () => listSessions());
+
+  // Window buttons are drawn by the renderer because the window is frameless.
+  ipcMain.handle('window:control', (_event, action) => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (action === 'minimize') mainWindow.minimize();
+    else if (action === 'maximize') {
+      if (mainWindow.isMaximized()) mainWindow.unmaximize();
+      else mainWindow.maximize();
+    } else if (action === 'close') mainWindow.close();
   });
 
   app.on('activate', () => {

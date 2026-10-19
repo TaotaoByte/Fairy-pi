@@ -38,22 +38,20 @@ npm start          # 开发态启动（自动先重建 Fairy 形象包）
 npm run package    # 打包 → ../out/Fairy-pi-win32-x64/Fairy-pi.exe
 ```
 
-界面是一套左侧边栏 + 多页面的客户端，信息架构、配色令牌与图标语汇都对着 Fairy-DSH 的深色 web 客户端做（配色直接取上游的 `--dsw-alias-*` 值，含浅色一套）。界面预览：[欢迎态](desktop/docs/screenshot.png) · [余额页](desktop/docs/screenshot-balance.png) · [设置页](desktop/docs/screenshot-settings.png) · [模型菜单](desktop/docs/screenshot-models.png) · [浅色主题](desktop/docs/screenshot-light.png) · [对话态](desktop/docs/screenshot-conversation.png)。
+界面照着 Fairy-DSH 客户端（其实体是 DeepSeek Harness 的 web 客户端）重做：**无边框窗口自带标题栏**（左侧窗口按钮 + 中间一条类似地址条的会话/目录 pill + 右侧朗读按钮），**左侧边栏是工作区而不是功能列表**，功能入口放在主区顶部的标签行。配色直接取上游的 `--dsw-alias-*` 令牌（深色 + 浅色两套），背景复刻它的 HDD 细网格与三团径向辉光。界面预览：[欢迎态](desktop/docs/screenshot.png) · [余额页](desktop/docs/screenshot-balance.png) · [设置页](desktop/docs/screenshot-settings.png) · [模型菜单](desktop/docs/screenshot-models.png) · [浅色主题](desktop/docs/screenshot-light.png) · [对话态](desktop/docs/screenshot-conversation.png)。
 
-- **侧边栏**：Fairy 眼形品牌标记 + 「新会话」+ 七个导航项（对话 / 余额 / 语音 / 人格 / 技能 / 浏览器坞 / 设置），底部是一张**余额卡**——正是 DSH 那个 `sidebar.footer.action` 槽位的对应物，直接显示余额、今日 token、今日估算，不需要输命令。
-- **模型切换**：顶部模型 chip 点开就是一个按 provider 分组的菜单（模型名 + 推理标签 + 上下文窗口），点击即走 `set_model` **热切换**，不重启会话；设置页里另有下拉 + 「思考档位」（`get_available_thinking_levels` / `set_thinking_level`）。
-- **余额页**：余额 / 今日 token / 今日估算 / Pi 记账四张指标卡，外加计价源注脚（计价模型、日期、峰谷档位）与本会话用量。数据由界面在后台跑一次 `/fairy-balance` 取得，用户看不到命令输入。
-- **语音页**：朗读开关、音色下拉（Web Speech 音色）、语速、试听一句，以及本地 Fairy TTS 服务的探测结果。
-- **人格页**：人设注入开关（`/fairy-persona on|off`）、状态、语料清单（含字节数与路径）。
-- **技能页**：把 `get_commands` 拆成「技能」与「扩展命令」两组，点「使用」直接把命令填进输入框。
-- **浏览器坞页**：坞状态、帧修订号、激活/关闭/接管按钮，以及原始状态 JSON。
-- **外观**：深色/浅色两套主题、Fairy 形象的显示开关、大小与动画速度（速度直接写上游的 `--dsh-fairy-steady-rate`）。
-- **Fairy 形象**：直接复用 Fairy-DSH 的 `fairy-visual` 低层绘图模块（几何、眼睛/光晕 SVG、样式表），**原样再分发、未改动**；由 [`build-mascot.mjs`](desktop/scripts/build-mascot.mjs) 打成一个浏览器可用的 IIFE 挂载。待机动画来自这些模块自带的 CSS 关键帧，不需要上游的 `mascot-runtime.js`。会话开始后 Fairy 从居中缩到右上角。背景的细网格与三团径向辉光也照上游的 HDD 层复刻。
-- **对话**：流式文本、thinking 折叠块、工具调用卡片（运行中/完成/失败 + 结果）、中断、新会话、切换工作目录、排队与 steering。
-- **命令**：输入 `/` 弹出命令面板，数据来自 `get_commands`，因此本包的 `/fairy-balance`、`/fairy-voice`、`/fairy-persona`、`/fairy-browser` 全部可用；名称一律用 pi 返回的原名（与别的包撞名时会显示成 `fairy-voice:2` 这种形式，那个后缀是必须的，原因见验证节）。
+- **侧边栏**：Fairy 眼形品牌标记 + 收起按钮 + 「新会话」+ 「工作区」会话树 + 底部余额卡 + 「设置」行。会话树按**工作目录分组**，每组可折叠并显示条数，会话行显示标题与相对时间（刚刚 / N 分钟前 / N 小时前），当前会话高亮；点一行即 `switch_session` 切过去，并用 `get_messages` 把历史重新渲染出来。数据来自主进程直接读取 `<agent_data>/sessions/**/*.jsonl`（pi 没有列出会话的 RPC 命令）。
+- **余额卡**：DSH `sidebar.footer.action` 那张卡的两行四格布局——余额 / 今日 token / 今日估算 / 峰谷档位，窄栏里用 `1.38M`、`≈¥0.072` 这种紧凑写法；启动时自动跑一次 `/fairy-balance` 填入，不需要输命令。
+- **顶部标签行**：会话名 + 对话 / 余额 / 语音 / 人格 / 技能 / 浏览器坞 / 设置，右侧是本会话用量与目录、新会话、中断。
+- **模型切换**：输入区右侧的模型 chip 点开就是按 provider 分组的菜单（模型名 + 推理标签 + 上下文窗口），点击走 `set_model` **热切换**，不重启会话；设置页另有下拉 + 「思考档位」（`get_available_thinking_levels` / `set_thinking_level`）。
+- **输入区**：一个药丸容器——左边工作目录 chip，中间输入框，右边模型 chip 与圆形发送按钮；`/` 仍弹出命令面板。
+- **消息排版**：不再是带边框的卡片，而是浮在背景上——用户消息右对齐浅蓝气泡，助手回复纯文本，悬停出现复制按钮，thinking 收成一行 `Think`。
+- **Fairy 形象**：固定为背景层，居中悬在会话区上方（`--mascot-zone` 预留它的高度，文案与消息都排在它下方，永不重叠）。直接复用 Fairy-DSH 的 `fairy-visual` 低层绘图模块（几何、眼睛/光晕 SVG、样式表），**原样再分发、未改动**；由 [`build-mascot.mjs`](desktop/scripts/build-mascot.mjs) 打成一个浏览器可用的 IIFE 挂载。待机动画来自这些模块自带的 CSS 关键帧，不需要上游的 `mascot-runtime.js`。
+- **其余页面**：余额页四张指标卡 + 计价源注脚；语音页（朗读开关/音色/语速/试听 + 本地 TTS 探测）；人格页（注入开关 + 语料清单）；技能页（技能与扩展命令两组）；浏览器坞页（状态 + 激活/关闭/接管 + 原始 JSON）；设置页（模型、思考档位、工作目录、外观、会话与运行时）。
+- **外观**：深色/浅色两套主题、形象显示开关、大小与动画速度（速度直接写上游的 `--dsh-fairy-steady-rate`）。
 - **扩展 UI**：实现了 `extension_ui_request` 的 `notify` / `setStatus` / `setWidget` / `setTitle` / `set_editor_text` 与四类对话框，扩展的提示能落到界面上。
 
-桌面端的窗口偏好（主题、朗读音色与语速、形象开关/大小/速度）存在渲染层 `localStorage`，不写 pi 的配置。
+桌面端的窗口偏好（主题、朗读音色与语速、形象开关/大小/速度、侧边栏收起状态）存在渲染层 `localStorage`，不写 pi 的配置。
 
 **`pi` 的位置如何找到**：`FAIRY_PI_AGENT_DIR` → `%LOCALAPPDATA%\Programs\pi-agent\agent_data` → PATH 上的 `pi` 启动器 → 各盘符的 `\Users\<你>\AppData\Local\Programs\pi-agent\agent_data`。装在非系统盘时靠最后一条兜底。可用 `FAIRY_PI_AGENT_DIR` / `FAIRY_PI_CLI` / `FAIRY_PI_NODE` / `FAIRY_PI_WORKDIR` 覆盖。
 
@@ -124,7 +122,9 @@ npm run test:e2e   # 真开窗口：切页面、开模型菜单、填空拍提�
 
 浏览器坞生产者：4 项集成测试真的起两个进程（代理 + 假 MCP）用 JSON-RPC 驱动，覆盖透明转发、任意图片落帧、工具名/参数命中人机验证、`takeover`/`close` 与收场清理；另有 2 项入口测试覆盖 `FAIRY_PI_BROWSER_MCP_ARGS` 的解析与注册。
 
-**桌面端**：先用一个探针脚本确认 `pi --mode rpc` 的握手（`get_state` / `get_commands` / `get_session_stats` / `get_available_models` 均正常返回、关 stdin 后干净退出），并实测 `set_model` 能热切换（切到 `deepseek-flash` 后 `get_state` 跟着变），然后对**打包出来的 `Fairy-pi.exe`** 跑了端到端：CDP 把它当用户操作——点侧边栏切页、开模型菜单、按 Esc 关闭、填输入框、派发提交、轮询界面——**31 项全部通过**（含欢迎态、余额页、设置页、模型菜单、浅色主题、对话态六张截图落盘），其中窗口标题为 `Fairy-pi · pi 1.0.4`、模型 chip 显示 `DeepSeek V4 Pro · deepseek`、侧边栏有 7 个导航项、余额卡自动填成 `13.87 CNY`、设置页列出 12 个模型、模型菜单 12 行且当前模型高亮、用户消息与助手回复都在屏上、`agent_settled` 后运行态回「空闲」、用量累计到 `5,835 tok`。Fairy 形象确实挂载（`[data-dsh-fairy-mascot-root="true"]`），子进程确认为 `node.exe <pi cli.js> --mode rpc`。
+**桌面端**：先用一个探针脚本确认 `pi --mode rpc` 的握手（`get_state` / `get_commands` / `get_session_stats` / `get_available_models` 均正常返回、关 stdin 后干净退出），并实测 `set_model` 能热切换（切到 `deepseek-flash` 后 `get_state` 跟着变），然后对**打包出来的 `Fairy-pi.exe`** 跑了端到端：CDP 把它当用户操作——点侧边栏切页、开模型菜单、按 Esc 关闭、填输入框、派发提交、轮询界面——**34 项全部通过**（含欢迎态、余额页、设置页、模型菜单、浅色主题、对话态六张截图落盘），其中窗口标题为 `Fairy-pi · pi 1.0.4`、模型 chip 显示 `DeepSeek V4 Pro`、顶栏 7 个标签页、侧边栏会话树按 6 个工作区分组、标题栏 pill 显示「会话名 · 工作目录」、余额卡自动填成 `13.85 CNY`、设置页列出 12 个模型、模型菜单 12 行且当前模型高亮、用户消息与助手回复都在屏上、`agent_settled` 后运行态回「空闲」、用量累计到 `5,835 tok`。Fairy 形象确实挂载（`[data-dsh-fairy-mascot-root="true"]`），子进程确认为 `node.exe <pi cli.js> --mode rpc`。
+
+**一条几何断言**：欢迎态曾出现文案压在形象上的问题（形象是固定背景层，而 `#messages` 也预留了同一块高度，页面因此可滚动、把文案顶了上去）。现在 e2e 直接断言 `文案顶边 ≥ 形象底边` 并打印两者的坐标，改坏了会当场失败，而不是靠人眼看截图。
 
 **命令名必须原样使用**：`get_commands` 里同名的两个命令，pi 会改名为 `fairy-voice:1` / `fairy-voice:2`（本机实测：`:1` 是旧的 pi-fairy 桌宠包，`:2` 是本包；那之后已用 `pi remove "G:\AI_Project\pi-fairy"` 卸掉旧包，现在本机只剩无后缀的 `fairy-voice`）。这两个后缀名才是可派发的命令——把后缀去掉得到的 `/fairy-voice` 不是命令，pi 会**把它当普通输入交给模型**（实测回包 `disposition: "started"`，模型开始翻目录找这个技能）。所以命令面板与欢迎态 chips 一律显示 `get_commands` 给出的原始名字，不做美化。
 

@@ -74,10 +74,18 @@ for (const page of PAGES) {
   check(`index.html defines the ${page} page`, html.includes(`data-page="${page}"`));
   check(`renderer routes to the ${page} page`, app.includes(`id: '${page}'`) || app.includes(`${page}: () =>`));
 }
-for (const id of ['nav', 'balance-card', 'side-balance', 'model-menu', 'page-title']) {
+for (const id of ['tabs', 'ws-tree', 'titlebar', 'titlebar-pill', 'session-title', 'balance-card', 'side-balance', 'side-band', 'model-menu', 'composer', 'input']) {
   check(`index.html declares #${id}`, html.includes(`id="${id}"`));
 }
 check('renderer has a page router', app.includes('function showPage(') && app.includes('dataset.page'));
+check('renderer builds the workspace tree', app.includes('function renderWsTree(') && app.includes('switch_session'));
+check('renderer restores a transcript', app.includes('function loadTranscript(') && app.includes('get_messages'));
+check('renderer drives the frameless window', app.includes('controlWindow('));
+const mainSource = readFileSync(path.join(root, 'src', 'main.cjs'), 'utf8');
+const preloadSource = readFileSync(path.join(root, 'src', 'preload.cjs'), 'utf8');
+check('main.cjs indexes sessions', mainSource.includes('function listSessions(') && mainSource.includes("ipcMain.handle('pi:sessions'"));
+check('main.cjs controls the frameless window', mainSource.includes("ipcMain.handle('window:control'") && mainSource.includes('frame: false'));
+check('preload exposes sessions and window control', preloadSource.includes('listSessions') && preloadSource.includes('controlWindow'));
 check('renderer captures panel command output', app.includes('function captureCommand(') && app.includes('capture.messages.push'));
 check('renderer offers a model switcher', app.includes('get_available_models') && app.includes("type: 'set_model'"));
 check('renderer offers thinking levels', app.includes('get_available_thinking_levels') && app.includes('set_thinking_level'));

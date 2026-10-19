@@ -22,38 +22,45 @@ const $ = (id) => document.getElementById(id);
 
 const nodes = {
   // shell
+  app: $('app'),
   sidebar: $('sidebar'),
-  nav: $('nav'),
+  titlebar: $('titlebar'),
+  titlebarPill: $('titlebar-pill'),
   workspace: $('workspace'),
   pages: $('pages'),
-  pageTitle: $('page-title'),
-  pageSub: $('page-sub'),
+  tabs: $('tabs'),
+  sessionTitle: $('session-title'),
   modelMenu: $('model-menu'),
   brand: $('brand'),
 
   // topbar
   chipModel: $('chip-model'),
   chipModelName: $('chip-model-name'),
-  chipCwd: $('chip-cwd'),
+  chipCwd: $('pill-cwd'),
+  chipCwdLabel: $('pill-cwd-label'),
   statTokens: $('stat-tokens'),
   statCost: $('stat-cost'),
   statContext: $('stat-context'),
-  btnVoice: $('btn-voice'),
+  btnWinVoice: $('btn-win-voice'),
   btnAbort: $('btn-abort'),
   btnNew: $('btn-new'),
   btnWorkdir: $('btn-workdir'),
   btnSend: $('btn-send'),
   btnSendLabel: $('btn-send-label'),
 
-  // sidebar footer
+  // sidebar
   btnNewSession: $('btn-new-session'),
   btnTheme: $('btn-theme'),
+  btnSidebarToggle: $('btn-sidebar-toggle'),
   btnGotoSettings: $('btn-goto-settings'),
+  btnWsSearch: $('btn-ws-search'),
+  wsTree: $('ws-tree'),
   balanceCard: $('balance-card'),
   runState: $('run-state'),
   sideBalance: $('side-balance'),
   sideToday: $('side-today'),
   sideCost: $('side-cost'),
+  sideBand: $('side-band'),
 
   // chat
   stage: $('stage'),
@@ -155,6 +162,7 @@ const DEFAULT_PREFS = {
   mascotVisible: true,
   mascotScale: 1,
   mascotSpeed: 1,
+  sidebarCollapsed: false,
 };
 
 function loadPrefs() {
@@ -200,6 +208,9 @@ const state = {
   widgets: new Map(),
   balance: null,
   browser: null,
+  sessions: [],
+  wsCollapsed: new Set(),
+  cwd: '',
 };
 
 const pending = new Map();
@@ -379,23 +390,18 @@ async function runPanelCommand(text, timeout) {
 // Navigation
 // ---------------------------------------------------------------------------
 
-function buildNav() {
-  nodes.nav.replaceChildren();
+function buildTabs() {
+  nodes.tabs.replaceChildren();
   for (const item of NAV) {
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = 'nav-item';
+    button.className = 'tab';
     button.dataset.page = item.id;
-    button.append(icon(item.icon));
-    const label = document.createElement('span');
-    label.textContent = item.label;
-    button.append(label);
-    const badge = document.createElement('span');
-    badge.className = 'nav-badge';
-    badge.dataset.badge = item.id;
-    button.append(badge);
+    button.setAttribute('role', 'tab');
+    button.setAttribute('aria-selected', 'false');
+    button.textContent = item.label;
     button.addEventListener('click', () => showPage(item.id));
-    nodes.nav.append(button);
+    nodes.tabs.append(button);
   }
 }
 
@@ -416,21 +422,12 @@ function showPage(id) {
     section.classList.toggle('active', active);
     section.hidden = !active;
   }
-  for (const button of nodes.nav.querySelectorAll('.nav-item')) {
-    if (button.dataset.page === next) button.setAttribute('aria-current', 'page');
-    else button.removeAttribute('aria-current');
+  for (const button of nodes.tabs.querySelectorAll('.tab')) {
+    button.setAttribute('aria-selected', String(button.dataset.page === next));
   }
-  const meta = NAV.find((entry) => entry.id === next);
-  nodes.pageTitle.textContent = meta ? meta.label : '对话';
-  nodes.pageSub.textContent = meta ? meta.sub : '';
-  if (next === 'chat') layoutHero();
+  if (next === 'chat') layoutMascot();
   const enter = PAGE_ENTER[next];
   if (enter) Promise.resolve(enter()).catch((error) => reportFailure('页面加载失败', error && error.message));
-}
-
-function navBadge(id, text) {
-  const badge = nodes.nav.querySelector(`.nav-badge[data-badge="${id}"]`);
-  if (badge) badge.textContent = text || '';
 }
 
 // ---------------------------------------------------------------------------
@@ -457,29 +454,27 @@ function setMascotState(next) {
   if (root) root.setAttribute('data-state', next);
 }
 
-/** Place the fixed mascot over the reserved slot so the welcome copy stays clear. */
-function layoutHero() {
-  if (nodes.fairyStage.classList.contains('docked')) return;
-  const slot = nodes.emptyState.querySelector('.mascot-slot');
-  if (!slot) return;
-  const rect = slot.getBoundingClientRect();
+/**
+ * The mascot is a fixed backdrop layer centred over the chat area. Its box is
+ * derived from the workspace rectangle, and `--mascot-zone` reserves exactly
+ * that space so both the welcome copy and the transcript start below it — the
+ * mascot itself never moves or collides with text.
+ */
+function layoutMascot() {
+  if (!prefs.mascotVisible) return;
+  const rect = nodes.workspace.getBoundingClientRect();
   if (rect.width === 0) return;
-  nodes.fairyStage.style.left = `${rect.left}px`;
-  nodes.fairyStage.style.top = `${rect.top}px`;
-  nodes.fairyStage.style.width = `${rect.width}px`;
-  nodes.fairyStage.style.height = `${rect.height}px`;
-}
-
-function dockMascot(docked) {
-  nodes.fairyStage.classList.toggle('hero', !docked);
-  nodes.fairyStage.classList.toggle('docked', docked);
-  if (docked) nodes.fairyStage.style.cssText = '';
-  else layoutHero();
+  const size = Math.round(Math.min(280, Math.max(150, rect.height * 0.34)) * prefs.mascotScale);
+  const top = 26;
+  nodes.fairyStage.style.left = `${Math.round(rect.left + (rect.width - size) / 2)}px`;
+  nodes.fairyStage.style.top = `${rect.top + top}px`;
+  nodes.fairyStage.style.width = `${size}px`;
+  nodes.fairyStage.style.height = `${size}px`;
+  nodes.stage.style.setProperty('--mascot-zone', `${size + top + 14}px`);
 }
 
 function setCaption(text) {
   nodes.fairyCaption.textContent = text;
-  nodes.fairyStage.classList.toggle('has-caption', Boolean(text) && !nodes.fairyStage.classList.contains('docked'));
 }
 
 function applyPrefs() {
@@ -505,9 +500,9 @@ function applyPrefs() {
     nodes.voiceRate.value = String(prefs.voiceRate);
     nodes.voiceRateValue.textContent = Number(prefs.voiceRate).toFixed(2);
   }
-  nodes.btnVoice.setAttribute('aria-pressed', String(prefs.voice));
+  if (nodes.btnWinVoice) nodes.btnWinVoice.setAttribute('aria-pressed', String(prefs.voice));
 
-  if (prefs.mascotVisible) layoutHero();
+  if (prefs.mascotVisible) layoutMascot();
 }
 
 // ---------------------------------------------------------------------------
@@ -521,34 +516,56 @@ function clearTranscript() {
   live = null;
   nodes.messages.classList.remove('has-content');
   nodes.emptyState.classList.remove('hidden');
-  dockMascot(false);
   setCaption('Fairy 待机中');
 }
 
 function markTranscriptHasContent() {
   nodes.messages.classList.add('has-content');
   nodes.emptyState.classList.add('hidden');
-  dockMascot(true);
 }
 
+/**
+ * The reference client shows turns directly on the background: no role header,
+ * just the content plus a row of small actions revealed on hover.
+ */
 function addBubble(role, label) {
   const el = document.createElement('article');
   el.className = `msg msg-${role}`;
-  const head = document.createElement('div');
-  head.className = 'msg-head';
-  const roleEl = document.createElement('span');
-  roleEl.className = 'msg-role';
-  roleEl.textContent = label;
-  const timeEl = document.createElement('span');
-  timeEl.className = 'msg-time';
-  timeEl.textContent = nowLabel();
-  head.append(roleEl, timeEl);
+  el.dataset.role = role;
+  if (role === 'system') {
+    const tag = document.createElement('div');
+    tag.className = 'msg-role';
+    tag.textContent = label || 'system';
+    el.append(tag);
+  }
   const body = document.createElement('div');
   body.className = 'msg-body';
-  el.append(head, body);
+  el.append(body);
+  const actions = document.createElement('div');
+  actions.className = 'msg-actions';
+  el.append(actions);
   nodes.messages.append(el);
   markTranscriptHasContent();
-  return { el, body };
+  return { el, body, actions };
+}
+
+function addMessageActions(card, rawText) {
+  if (!card || !card.actions) return;
+  card.actions.replaceChildren();
+  const copy = document.createElement('button');
+  copy.type = 'button';
+  copy.className = 'msg-action';
+  copy.title = '复制这条消息';
+  copy.append(icon('i-copy'));
+  copy.addEventListener('click', () => {
+    const text = String(rawText || '');
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(
+      () => toast('已复制', 'info'),
+      () => toast('复制失败（剪贴板不可用）', 'warning'),
+    );
+  });
+  card.actions.append(copy);
 }
 
 function scrollToEnd() {
@@ -557,26 +574,29 @@ function scrollToEnd() {
 
 function renderStaticMessage(message) {
   const role = message && message.role;
+  const text = messageText(message);
   if (role === 'user') {
-    const { body } = addBubble('user', '你');
-    body.innerHTML = renderMarkdown(messageText(message));
+    const card = addBubble('user', '你');
+    card.body.innerHTML = renderMarkdown(text);
+    addMessageActions(card, text);
     return;
   }
   if (role === 'assistant') {
-    const { body } = addBubble('assistant', 'Fairy');
+    const card = addBubble('assistant', 'Fairy');
     if (Array.isArray(message.content)) {
       for (const block of message.content) {
-        if (block && block.type === 'thinking') body.append(thinkingBlock(blockText(block)));
+        if (block && block.type === 'thinking') card.body.append(thinkingBlock(blockText(block)));
       }
     }
     const holder = document.createElement('div');
-    holder.innerHTML = renderMarkdown(messageText(message));
-    body.append(holder);
+    holder.innerHTML = renderMarkdown(text);
+    card.body.append(holder);
+    addMessageActions(card, text);
     return;
   }
   if (role === 'system') {
-    const { body } = addBubble('system', 'system');
-    body.textContent = messageText(message) || JSON.stringify(message).slice(0, 400);
+    const card = addBubble('system', 'system');
+    card.body.textContent = text || JSON.stringify(message).slice(0, 400);
   }
 }
 
@@ -584,7 +604,10 @@ function thinkingBlock(text) {
   const details = document.createElement('details');
   details.className = 'thinking';
   const summary = document.createElement('summary');
-  summary.textContent = 'thinking';
+  summary.append(icon('i-think'));
+  const label = document.createElement('span');
+  label.textContent = 'Think';
+  summary.append(label);
   const body = document.createElement('div');
   body.textContent = text;
   details.append(summary, body);
@@ -834,15 +857,15 @@ function handleSessionEvent(record) {
       break;
     case 'message_start':
       if (record.message && record.message.role === 'assistant') {
-        const { el, body } = addBubble('assistant', 'Fairy');
-        live = { el, body, mode: null };
+        const card = addBubble('assistant', 'Fairy');
+        live = { el: card.el, body: card.body, actions: card.actions, mode: null };
       }
       break;
     case 'message_update': {
       const event = record.assistantMessageEvent || {};
       if (!live) {
         const created = addBubble('assistant', 'Fairy');
-        live = { el: created.el, body: created.body, mode: null };
+        live = { el: created.el, body: created.body, actions: created.actions, mode: null };
       }
       if (event.type === 'thinking_start' || event.type === 'thinking_delta' || event.type === 'thinking_end') {
         if (live.mode !== 'thinking') {
@@ -873,7 +896,7 @@ function handleSessionEvent(record) {
       if (message && message.role === 'assistant') {
         if (!live) {
           const created = addBubble('assistant', 'Fairy');
-          live = { el: created.el, body: created.body };
+          live = { el: created.el, body: created.body, actions: created.actions };
         }
         live.body.replaceChildren();
         const holder = document.createElement('div');
@@ -884,6 +907,7 @@ function handleSessionEvent(record) {
             if (block && block.type === 'thinking') live.body.prepend(thinkingBlock(blockText(block)));
           }
         }
+        addMessageActions(live, messageText(message));
         live = null;
         scrollToEnd();
       } else if (message && message.role === 'user') {
@@ -956,12 +980,21 @@ function handleSessionEvent(record) {
 function updateModelChip() {
   const model = state.currentModel;
   const label = model ? model.name || model.id : '—';
-  const suffix = model && model.provider ? ` · ${model.provider}` : '';
-  nodes.chipModelName.textContent = state.sessionName ? `${label}${suffix} · ${state.sessionName}` : `${label}${suffix}`;
+  nodes.chipModelName.textContent = label;
   nodes.chipModel.title = model
     ? `当前模型：${label}（${model.provider}/${model.id}）\n上下文 ${model.contextWindow || '—'} · ${model.reasoning ? '支持推理' : '不支持推理'}`
     : '当前模型';
-  navBadge('chat', '');
+}
+
+/** The session name is shown in the header and mirrored into the title bar. */
+function updateSessionHeaders() {
+  const title = state.sessionName || '未命名会话';
+  if (nodes.sessionTitle) nodes.sessionTitle.textContent = title;
+  if (nodes.titlebarPill) {
+    const cwd = state.cwd || '';
+    nodes.titlebarPill.textContent = cwd ? `${title}  ·  ${cwd}` : title;
+    nodes.titlebarPill.title = `${title}\n工作目录：${cwd || '未知'}`;
+  }
 }
 
 async function refreshState() {
@@ -972,6 +1005,7 @@ async function refreshState() {
     state.sessionId = result.data.sessionId || '';
     state.messageCount = result.data.messageCount || 0;
     updateModelChip();
+    updateSessionHeaders();
     setRunning(Boolean(result.data.isStreaming));
   }
 }
@@ -1233,8 +1267,6 @@ async function speakLatest() {
 async function refreshVoiceService() {
   const text = await runPanelCommand('/fairy-voice status', 12000);
   nodes.voiceService.textContent = text || '本地语音服务未返回信息。';
-  const ok = /正常|可用|available/i.test(text) && !/不可用|未启动/.test(text);
-  navBadge('voice', ok ? '在线' : '离线');
 }
 
 // ---------------------------------------------------------------------------
@@ -1252,9 +1284,31 @@ function parseBalance(text) {
       const paren = out.cost.match(/[（(]([^）)]+)[）)]/);
       if (paren) out.source = paren[1].trim();
       out.cost = out.cost.replace(/[（(][^）)]+[）)]/, '').trim();
+      const band = out.source.match(/当前档位\s*([^\s，,]+)/);
+      if (band) out.band = band[1] === 'peak' ? '高峰' : band[1] === 'offpeak' ? '低谷' : band[1];
     } else if ((match = line.match(/Pi 记账[：:]\s*(.+)/))) out.ledger = match[1].trim();
   }
   return out;
+}
+
+/** Compact form for the narrow sidebar card (the exact value stays on the page). */
+function compactNumber(value) {
+  const n = Number(value || 0);
+  if (!Number.isFinite(n)) return String(value || '—');
+  if (n >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
+  if (n >= 1e5) return `${Math.round(n / 1000)}k`;
+  if (n >= 1e4) return `${(n / 1000).toFixed(1)}k`;
+  return String(n);
+}
+
+/** Trims the estimate to three significant digits so it fits the narrow card. */
+function compactCost(text) {
+  const source = String(text || '');
+  const match = source.match(/^([^\d]*)([\d.]+)(.*)$/);
+  if (!match) return source || '—';
+  const n = Number(match[2]);
+  if (!Number.isFinite(n)) return source;
+  return `${match[1]}${n.toFixed(n >= 1 ? 2 : 3)}${match[3]}`;
 }
 
 function renderBalance() {
@@ -1265,12 +1319,16 @@ function renderBalance() {
     setAll([nodes.balToday, nodes.sideToday], '—');
     setAll([nodes.balCost, nodes.sideCost], '—');
     setAll([nodes.balLedger], '—');
+    if (nodes.sideBand) nodes.sideBand.textContent = '—';
     return;
   }
   setAll([nodes.balBalance, nodes.sideBalance], data.balance || '—');
-  setAll([nodes.balToday, nodes.sideToday], data.today || '—');
-  setAll([nodes.balCost, nodes.sideCost], data.cost || '—');
+  setAll([nodes.sideToday], data.today ? compactNumber(String(data.today).replace(/[^\d.]/g, '')) : '—');
+  setAll([nodes.balToday], data.today || '—');
+  setAll([nodes.balCost], data.cost || '—');
+  setAll([nodes.sideCost], data.cost ? compactCost(data.cost) : '—');
   setAll([nodes.balLedger], data.ledger || '—');
+  if (nodes.sideBand) nodes.sideBand.textContent = data.band || '—';
   nodes.balanceSource.textContent = data.source
     ? `计价源：${data.source}。数据由 /fairy-balance 向 DeepSeek 拉取，仅用于估算。`
     : '数据由 /fairy-balance 向 DeepSeek 拉取，仅用于估算。';
@@ -1336,7 +1394,6 @@ async function refreshPersona() {
   nodes.personaStatus.textContent = status || '人格插件未返回信息。';
   const enabled = /已开启|已启用|开启中/.test(status) && !/已关闭/.test(status);
   nodes.personaEnabled.checked = enabled;
-  navBadge('persona', enabled ? '开' : '关');
   const corpus = await runPanelCommand('/fairy-persona corpus', 12000);
   renderCorpus(parseCorpus(corpus));
 }
@@ -1389,7 +1446,6 @@ function renderSkills() {
   };
   fill(nodes.skillsList, skills, '/');
   fill(nodes.extList, extensions, '/');
-  navBadge('skills', String(skills.length));
 }
 
 // ---------------------------------------------------------------------------
@@ -1409,7 +1465,6 @@ function renderBrowser() {
   nodes.browserStatus.dataset.state = active ? 'active' : 'warning';
   nodes.browserUrl.textContent = data.title || data.url || '';
   nodes.browserState.textContent = JSON.stringify(data, null, 2);
-  navBadge('browser', active ? '活动' : '');
 }
 
 async function refreshBrowser() {
@@ -1472,6 +1527,144 @@ async function chooseWorkdir() {
   await api.restart({ cwd: picked });
   await afterStart();
   toast(`工作目录已切到 ${picked}`, 'info');
+}
+
+// ---------------------------------------------------------------------------
+// Workspace tree
+// ---------------------------------------------------------------------------
+
+function relativeTime(ms) {
+  const value = Number(ms || 0);
+  const diff = Date.now() - value;
+  if (!Number.isFinite(diff) || diff < 0) return '';
+  const minute = 60000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  if (diff < minute) return '刚刚';
+  if (diff < hour) return `${Math.floor(diff / minute)} 分钟前`;
+  if (diff < day) return `${Math.floor(diff / hour)} 小时前`;
+  if (diff < 7 * day) return `${Math.floor(diff / day)} 天前`;
+  return new Date(value).toLocaleDateString('zh-CN');
+}
+
+function workspaceLabel(cwd) {
+  if (!cwd) return '未分组';
+  const parts = String(cwd).split(/[\\/]+/).filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : String(cwd);
+}
+
+/** Both strings below are the ones the sidebar and title bar show. */
+async function loadSessions() {
+  let sessions = [];
+  try {
+    sessions = (await api.listSessions()) || [];
+  } catch (error) {
+    reportFailure('读取会话列表失败', error && error.message);
+    return;
+  }
+  state.sessions = sessions;
+  renderWsTree();
+}
+
+function renderWsTree() {
+  nodes.wsTree.replaceChildren();
+  const sessions = state.sessions || [];
+  if (!sessions.length) {
+    const empty = document.createElement('p');
+    empty.className = 'ws-empty';
+    empty.textContent = '还没有会话记录。';
+    nodes.wsTree.append(empty);
+    return;
+  }
+
+  const groups = new Map();
+  for (const session of sessions) {
+    const key = session.cwd || '';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(session);
+  }
+
+  // The active working directory is listed first; the rest follow by recency.
+  const currentCwd = state.cwd || '';
+  const ordered = [...groups.entries()].sort((a, b) => {
+    if (a[0] === currentCwd) return -1;
+    if (b[0] === currentCwd) return 1;
+    return (b[1][0] ? b[1][0].mtime : 0) - (a[1][0] ? a[1][0].mtime : 0);
+  });
+
+  for (const [cwd, list] of ordered) {
+    const collapsed = state.wsCollapsed.has(cwd);
+    const group = document.createElement('button');
+    group.type = 'button';
+    group.className = 'ws-group';
+    group.title = cwd || '未记录工作目录';
+    group.append(icon('i-folder'));
+    const label = document.createElement('span');
+    label.className = 'ws-group-label';
+    label.textContent = workspaceLabel(cwd);
+    group.append(label);
+    const count = document.createElement('span');
+    count.className = 'ws-group-count';
+    count.textContent = collapsed ? '▸' : String(list.length);
+    group.append(count);
+    group.addEventListener('click', () => {
+      if (state.wsCollapsed.has(cwd)) state.wsCollapsed.delete(cwd);
+      else state.wsCollapsed.add(cwd);
+      renderWsTree();
+    });
+    nodes.wsTree.append(group);
+
+    if (collapsed) continue;
+    for (const session of list) {
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'ws-session';
+      row.title = `${session.title}\n${session.path}`;
+      if (state.sessionId && session.id === state.sessionId) row.setAttribute('aria-current', 'true');
+      const title = document.createElement('span');
+      title.className = 'ws-session-title';
+      title.textContent = session.title || '未命名';
+      const time = document.createElement('span');
+      time.className = 'ws-session-time';
+      time.textContent = relativeTime(session.mtime);
+      row.append(title, time);
+      row.addEventListener('click', () => switchSession(session));
+      nodes.wsTree.append(row);
+    }
+  }
+}
+
+/** Re-renders the transcript from pi's own message list, used after a switch. */
+async function loadTranscript() {
+  const result = await command({ type: 'get_messages' });
+  clearTranscript();
+  if (!result.success || !result.data) return;
+  for (const message of result.data.messages || []) {
+    if (!message) continue;
+    if (message.role !== 'user' && message.role !== 'assistant') continue;
+    renderStaticMessage(message);
+  }
+  scrollToEnd();
+}
+
+async function switchSession(session) {
+  if (session.id && session.id === state.sessionId) {
+    showPage('chat');
+    return;
+  }
+  const result = await command({ type: 'switch_session', sessionPath: session.path });
+  if (!result.success || (result.data && result.data.cancelled)) {
+    const why = result.data && result.data.cancelled ? '被扩展取消' : result.error || '未知原因';
+    toast(`切换会话失败：${why}`, 'error');
+    return;
+  }
+  state.lastSpokenText = '';
+  await refreshState();
+  await refreshStats();
+  await loadTranscript();
+  renderWsTree();
+  showPage('chat');
+  toast(`已切到会话：${session.title || session.id || ''}`, 'info');
 }
 
 // ---------------------------------------------------------------------------
@@ -1600,17 +1793,33 @@ function handleStatus(status) {
   }
 }
 
-function bindShell() {
-  buildNav();
+function toggleVoice() {
+  prefs.voice = !prefs.voice;
+  savePrefs();
+  applyPrefs();
+  if (!prefs.voice && window.speechSynthesis) window.speechSynthesis.cancel();
+  toast(prefs.voice ? '语音朗读已开启' : '语音朗读已关闭', 'info');
+  if (prefs.voice) speakLatest();
+}
 
-  nodes.btnVoice.addEventListener('click', () => {
-    prefs.voice = !prefs.voice;
+function bindShell() {
+  buildTabs();
+
+  // Window chrome (the window is frameless).
+  for (const button of document.querySelectorAll('[data-window]')) {
+    button.addEventListener('click', () => api.controlWindow(button.dataset.window));
+  }
+  nodes.titlebar.addEventListener('dblclick', () => api.controlWindow('maximize'));
+
+  nodes.btnSidebarToggle.addEventListener('click', () => {
+    nodes.app.classList.toggle('collapsed');
+    const collapsed = nodes.app.classList.contains('collapsed');
+    prefs.sidebarCollapsed = collapsed;
     savePrefs();
-    applyPrefs();
-    if (!prefs.voice && window.speechSynthesis) window.speechSynthesis.cancel();
-    toast(prefs.voice ? '语音朗读已开启' : '语音朗读已关闭', 'info');
-    if (prefs.voice) speakLatest();
+    setTimeout(layoutMascot, 240);
   });
+
+  nodes.btnWinVoice.addEventListener('click', toggleVoice);
 
   nodes.btnAbort.addEventListener('click', () => command({ type: 'abort' }));
 
@@ -1640,6 +1849,7 @@ function bindShell() {
 
   nodes.btnGotoSettings.addEventListener('click', () => showPage('settings'));
   nodes.balanceCard.addEventListener('click', () => showPage('balance'));
+  nodes.btnWsSearch.addEventListener('click', () => loadSessions());
 
   nodes.chipModel.addEventListener('click', (event) => {
     event.stopPropagation();
@@ -1768,7 +1978,7 @@ function bindShell() {
   });
 
   window.addEventListener('resize', () => {
-    layoutHero();
+    layoutMascot();
     if (!nodes.modelMenu.hidden) closeModelMenu();
   });
 }
@@ -1776,10 +1986,11 @@ function bindShell() {
 async function boot() {
   applyPrefs();
   mountMascot();
-  applyPrefs();
+  if (prefs.sidebarCollapsed) nodes.app.classList.add('collapsed');
   bindShell();
   showPage('chat');
-  layoutHero();
+  layoutMascot();
+  window.addEventListener('resize', layoutMascot);
 
   api.onRecord(handleRecord);
   api.onStatus(handleStatus);
@@ -1805,8 +2016,15 @@ async function boot() {
     }${info && info.piPath ? ` @ ${info.piPath}` : ''}`,
   );
   if (info) {
-    nodes.chipCwd.textContent = info.cwd || '—';
-    nodes.chipCwd.title = `pi 的工作目录：${info.cwd}\npi：${info.piPath || '未找到'}`;
+    state.cwd = info.cwd || '';
+    if (nodes.chipCwdLabel) {
+      const parts = String(state.cwd).split(/[\\/]+/).filter(Boolean);
+      nodes.chipCwdLabel.textContent = parts.length ? parts[parts.length - 1] : '—';
+    }
+    if (nodes.chipCwd) {
+      nodes.chipCwd.title = `pi 的工作目录：${info.cwd}\npi：${info.piPath || '未找到'}`;
+    }
+    updateSessionHeaders();
     if (info.piError) {
       nodes.runState.textContent = '未找到 pi';
       nodes.runState.className = 'run-state error';
@@ -1824,12 +2042,14 @@ async function boot() {
 async function afterStart() {
   await refreshState();
   await refreshStats();
+  await loadTranscript();
+  await loadSessions();
   await loadCommands();
   await loadModels();
   fillVoiceSelect();
   renderBalance();
   handleStatus({ state: 'ready' });
-  // The sidebar card mirrors DSH's one; fill it once at startup.
+  // The sidebar card mirrors the reference client's; fill it once at startup.
   refreshBalance().catch(() => {});
 }
 

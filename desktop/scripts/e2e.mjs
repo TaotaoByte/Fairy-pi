@@ -246,6 +246,23 @@ async function main() {
   check('主题能切回深色', themeDark.value === 'dark', String(themeDark.value));
   await sleep(400);
 
+  // One screenshot per feature page, so the README can show what each does.
+  for (const [page, shot] of [['voice', 'voice'], ['persona', 'persona'], ['skills', 'skills'], ['browser', 'browser']]) {
+    await cdp.evaluate(`document.querySelector('#tabs .tab[data-page="${page}"]').click()`);
+    await sleep(1400);
+    const view = await cdp.evaluate(readState);
+    check(`能切到「${page}」页`, view.value.activePage === page, view.value.activePage);
+    if (shotDir) {
+      const saved = await cdp.captureScreenshot(path.join(shotDir, `screenshot-${shot}.png`));
+      check(`${page} 页截图已保存`, saved);
+    }
+  }
+
+  await cdp.evaluate(`document.querySelector('#tabs .tab[data-page="chat"]').click()`);
+  await sleep(500);
+  const back = await cdp.evaluate(readState);
+  check('能切回对话页', back.value.activePage === 'chat', back.value.activePage);
+
   await cdp.evaluate(`document.getElementById('chip-model').click()`);
   await sleep(600);
   const menu = await cdp.evaluate(readState);
@@ -259,11 +276,6 @@ async function main() {
   await sleep(400);
   const closed = await cdp.evaluate(readState);
   check('Esc 关闭模型菜单', closed.value.modelMenuOpen === false);
-
-  await cdp.evaluate(`document.querySelector('#tabs .tab[data-page="chat"]').click()`);
-  await sleep(500);
-  const back = await cdp.evaluate(readState);
-  check('能切回对话页', back.value.activePage === 'chat', back.value.activePage);
 
   // The submit listener clears the field synchronously inside dispatchEvent,
   // so read the value back before dispatching.

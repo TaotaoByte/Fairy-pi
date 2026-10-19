@@ -12,7 +12,8 @@
     "test:e2e": "node scripts/e2e.mjs",
     "build:mascot": "node scripts/build-mascot.mjs",
     "smoke": "node scripts/smoke.mjs",
-    "package": "node scripts/package.mjs"
+    "package": "node scripts/package.mjs",
+    "release:zip": "node scripts/zip.mjs"
   },
   "devDependencies": {
     "@electron/packager": "^18.4.0",

@@ -1,0 +1,45 @@
+name: release
+
+# 打一个 v* 标签就会在这里构建 Windows 包，并把它挂到对应的 Release 上，
+# 别人在 Releases 页面直接下载 zip、解压、双击 Fairy-pi.exe 即可。
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  windows-x64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: 安装依赖
+        working-directory: desktop
+        run: npm ci
+
+      - name: 静态检查
+        working-directory: desktop
+        run: npm test
+
+      - name: 打包
+        working-directory: desktop
+        run: npm run package
+
+      - name: 压缩成 zip
+        working-directory: desktop
+        run: npm run release:zip
+
+      - name: 挂到 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/Fairy-pi-win32-x64.zip
+          generate_release_notes: true

@@ -38,7 +38,7 @@ npm start          # 开发态启动（自动先重建 Fairy 形象包）
 npm run package    # 打包 → ../out/Fairy-pi-win32-x64/Fairy-pi.exe
 ```
 
-界面照着 Fairy-DSH 客户端（其实体是 DeepSeek Harness 的 web 客户端）重做：**无边框窗口自带标题栏**（左侧窗口按钮 + 中间一条类似地址条的会话/目录 pill + 右侧朗读按钮），**左侧边栏是工作区而不是功能列表**，功能入口放在主区顶部的标签行。配色直接取上游的 `--dsw-alias-*` 令牌（深色 + 浅色两套），背景复刻它的 HDD 细网格与三团径向辉光。界面预览：[欢迎态](desktop/docs/screenshot.png) · [余额页](desktop/docs/screenshot-balance.png) · [设置页](desktop/docs/screenshot-settings.png) · [模型菜单](desktop/docs/screenshot-models.png) · [浅色主题](desktop/docs/screenshot-light.png) · [对话态](desktop/docs/screenshot-conversation.png)。
+界面照着 Fairy-DSH 客户端（其实体是 DeepSeek Harness 的 web 客户端）重做：**无边框窗口自带标题栏**（左侧窗口按钮 + 中间一条类似地址条的会话/目录 pill + 右侧朗读按钮），**左侧边栏是工作区而不是功能列表**，功能入口放在主区顶部的标签行。配色直接取上游的 `--dsw-alias-*` 令牌（深色 + 浅色两套），背景复刻它的 HDD 细网格与三团径向辉光。下面的截图全部来自**打包出来的 `Fairy-pi.exe`**（e2e 自动采集，不是示意图）。
 
 - **侧边栏**：Fairy 眼形品牌标记 + 收起按钮 + 「新会话」+ 「工作区」会话树 + 底部余额卡 + 「设置」行。会话树按**工作目录分组**，每组可折叠并显示条数，会话行显示标题与相对时间（刚刚 / N 分钟前 / N 小时前），当前会话高亮；点一行即 `switch_session` 切过去，并用 `get_messages` 把历史重新渲染出来。数据来自主进程直接读取 `<agent_data>/sessions/**/*.jsonl`（pi 没有列出会话的 RPC 命令）。
 - **余额卡**：DSH `sidebar.footer.action` 那张卡的两行四格布局——余额 / 今日 token / 今日估算 / 峰谷档位，窄栏里用 `1.38M`、`≈¥0.072` 这种紧凑写法；启动时自动跑一次 `/fairy-balance` 填入，不需要输命令。
@@ -53,6 +53,31 @@ npm run package    # 打包 → ../out/Fairy-pi-win32-x64/Fairy-pi.exe
 
 桌面端的窗口偏好（主题、朗读音色与语速、形象开关/大小/速度、侧边栏收起状态）存在渲染层 `localStorage`，不写 pi 的配置。
 
+### 界面
+
+<table>
+  <tr>
+    <td width="50%" align="center"><img src="desktop/docs/screenshot.png" alt="欢迎态"><br><sub>欢迎态：左栏是工作区与会话树，底部余额卡，形象居中</sub></td>
+    <td width="50%" align="center"><img src="desktop/docs/screenshot-conversation.png" alt="对话态"><br><sub>对话态：用户右对齐气泡、助手纯文本、形象作为背景层</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><img src="desktop/docs/screenshot-models.png" alt="模型菜单"><br><sub>模型切换：按 provider 分组，当前模型高亮，点了即时生效</sub></td>
+    <td width="50%" align="center"><img src="desktop/docs/screenshot-balance.png" alt="余额页"><br><sub>余额页：余额 / 今日 token / 今日估算 / Pi 记账 + 计价源注脚</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><img src="desktop/docs/screenshot-settings.png" alt="设置页"><br><sub>设置页：模型、思考档位、工作目录、外观</sub></td>
+    <td width="50%" align="center"><img src="desktop/docs/screenshot-light.png" alt="浅色主题"><br><sub>浅色主题：同一套令牌的另一半</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><img src="desktop/docs/screenshot-voice.png" alt="语音页"><br><sub>语音页：朗读开关、音色、语速、本地 TTS 探测</sub></td>
+    <td width="50%" align="center"><img src="desktop/docs/screenshot-persona.png" alt="人格页"><br><sub>人格页：注入开关、状态、语料清单</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><img src="desktop/docs/screenshot-skills.png" alt="技能页"><br><sub>技能页：技能与扩展命令两组，点「使用」填入输入框</sub></td>
+    <td width="50%" align="center"><img src="desktop/docs/screenshot-browser.png" alt="浏览器坞页"><br><sub>浏览器坞：状态、激活/关闭/接管、原始状态 JSON</sub></td>
+  </tr>
+</table>
+
 **`pi` 的位置如何找到**：`FAIRY_PI_AGENT_DIR` → `%LOCALAPPDATA%\Programs\pi-agent\agent_data` → PATH 上的 `pi` 启动器 → 各盘符的 `\Users\<你>\AppData\Local\Programs\pi-agent\agent_data`。装在非系统盘时靠最后一条兜底。可用 `FAIRY_PI_AGENT_DIR` / `FAIRY_PI_CLI` / `FAIRY_PI_NODE` / `FAIRY_PI_WORKDIR` 覆盖。
 
 **明确不做什么**：不起 HTTP 服务、不监听端口（`--remote-debugging-port` 只在自动化测试时由测试脚本传入）、不驱动 DSH、不碰 DeepSeek Harness。
@@ -61,7 +86,48 @@ npm run package    # 打包 → ../out/Fairy-pi-win32-x64/Fairy-pi.exe
 cd desktop
 npm test           # 静态检查 + 形象包实机求值 + pi 定位 + 外壳接线
 npm run test:e2e   # 真开窗口：切页面、开模型菜单、填空拍提交、断言回复与用量
+                   # 设 FAIRY_PI_E2E_SCREENSHOT_DIR 还会把 docs/ 里那批截图重新采一遍
 ```
+
+## 打包与发布
+
+已打包的 `out/` 不进仓库（`.gitignore` 挡着），分发走 GitHub Releases。
+
+### 出一个可分发的单文件
+
+```bash
+cd desktop
+npm install
+npm run package      # → ../out/Fairy-pi-win32-x64/
+npm run release:zip  # → ../out/Fairy-pi-win32-x64.zip（约 110 MB）
+```
+
+### 方式一：手动传到 Release（不需要任何 CI）
+
+1. 打开 <https://github.com/TaotaoByte/Fairy-pi/releases> → `Draft a new release`
+2. `Choose a tag` 里填 `v0.1.0`，选 `Create new tag`（目标分支选 `main`）
+3. 把 `out/Fairy-pi-win32-x64.zip` 拖进附件区，写两句说明，`Publish release`
+
+### 方式二：打个 tag，交给 GitHub Actions 自动发布
+
+仓库里已带 [`.github/workflows/release.yml`](.github/workflows/release.yml)：推送 `v*` 标签即触发 `windows-latest` 上的 `npm ci` → `npm test` → 打包 → 压缩 → 挂到同名 Release（release notes 自动生成）。
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+本机若装了 `gh`，也可以不用 CI，一条命令直接传：
+
+```bash
+gh release create v0.1.0 out/Fairy-pi-win32-x64.zip --title "Fairy-pi v0.1.0" --generate-notes
+```
+
+### 下载的人需要知道什么
+
+- 解压后双击 `Fairy-pi.exe`。**它本身不是 agent**——窗口里的对话由**本机的 `pi`** 承担，所以对方机器上得先装 pi（`npm i -g @earendil-works/pi-coding-agent` 或它自带的安装器），并且 pi 里要有可用的 provider 与凭据。
+- 找不到 pi 时不会静默失败：底部状态写「未找到 pi」并弹提示；可用 `FAIRY_PI_AGENT_DIR` / `FAIRY_PI_CLI` / `FAIRY_PI_NODE` / `FAIRY_PI_WORKDIR` 指路。
+- 未做代码签名，Windows SmartScreen 可能拦一次（「更多信息」→「仍要运行」）。
 
 ## 命令
 
@@ -122,7 +188,7 @@ npm run test:e2e   # 真开窗口：切页面、开模型菜单、填空拍提�
 
 浏览器坞生产者：4 项集成测试真的起两个进程（代理 + 假 MCP）用 JSON-RPC 驱动，覆盖透明转发、任意图片落帧、工具名/参数命中人机验证、`takeover`/`close` 与收场清理；另有 2 项入口测试覆盖 `FAIRY_PI_BROWSER_MCP_ARGS` 的解析与注册。
 
-**桌面端**：先用一个探针脚本确认 `pi --mode rpc` 的握手（`get_state` / `get_commands` / `get_session_stats` / `get_available_models` 均正常返回、关 stdin 后干净退出），并实测 `set_model` 能热切换（切到 `deepseek-flash` 后 `get_state` 跟着变），然后对**打包出来的 `Fairy-pi.exe`** 跑了端到端：CDP 把它当用户操作——点侧边栏切页、开模型菜单、按 Esc 关闭、填输入框、派发提交、轮询界面——**34 项全部通过**（含欢迎态、余额页、设置页、模型菜单、浅色主题、对话态六张截图落盘），其中窗口标题为 `Fairy-pi · pi 1.0.4`、模型 chip 显示 `DeepSeek V4 Pro`、顶栏 7 个标签页、侧边栏会话树按 6 个工作区分组、标题栏 pill 显示「会话名 · 工作目录」、余额卡自动填成 `13.85 CNY`、设置页列出 12 个模型、模型菜单 12 行且当前模型高亮、用户消息与助手回复都在屏上、`agent_settled` 后运行态回「空闲」、用量累计到 `5,835 tok`。Fairy 形象确实挂载（`[data-dsh-fairy-mascot-root="true"]`），子进程确认为 `node.exe <pi cli.js> --mode rpc`。
+**桌面端**：先用一个探针脚本确认 `pi --mode rpc` 的握手（`get_state` / `get_commands` / `get_session_stats` / `get_available_models` 均正常返回、关 stdin 后干净退出），并实测 `set_model` 能热切换（切到 `deepseek-flash` 后 `get_state` 跟着变），然后对**打包出来的 `Fairy-pi.exe`** 跑了端到端：CDP 把它当用户操作——点侧边栏切页、开模型菜单、按 Esc 关闭、填输入框、派发提交、轮询界面——**42 项全部通过**（含欢迎态、对话态、余额页、设置页、语音页、人格页、技能页、浏览器坞页、模型菜单、浅色主题共十张截图落盘），其中窗口标题为 `Fairy-pi · pi 1.0.4`、模型 chip 显示 `DeepSeek V4 Pro`、顶栏 7 个标签页、侧边栏会话树按 6 个工作区分组、标题栏 pill 显示「会话名 · 工作目录」、余额卡自动填成 `13.85 CNY`、设置页列出 12 个模型、模型菜单 12 行且当前模型高亮、用户消息与助手回复都在屏上、`agent_settled` 后运行态回「空闲」、用量累计到 `5,835 tok`。Fairy 形象确实挂载（`[data-dsh-fairy-mascot-root="true"]`），子进程确认为 `node.exe <pi cli.js> --mode rpc`。
 
 **一条几何断言**：欢迎态曾出现文案压在形象上的问题（形象是固定背景层，而 `#messages` 也预留了同一块高度，页面因此可滚动、把文案顶了上去）。现在 e2e 直接断言 `文案顶边 ≥ 形象底边` 并打印两者的坐标，改坏了会当场失败，而不是靠人眼看截图。
 
@@ -152,12 +218,14 @@ Fairy-pi/
 ├── skills/fairy-persona/    人格技能（SKILL.md）
 ├── assets/persona/          上游语料（Apache-2.0，未改动内容）
 ├── desktop/                 Electron 桌面前端（见上节）
-│   ├── src/main.cjs         主进程：进程管理与 RPC 桥
+│   ├── src/main.cjs         主进程：进程管理、RPC 桥、会话索引、窗口控制
 │   ├── src/pi-locate.cjs    pi 定位（可独立测试）
 │   ├── src/preload.cjs      contextBridge 白名单
 │   ├── src/renderer/        界面（index.html / styles.css / app.js）
+│   ├── docs/                e2e 采集的界面截图（README 里引用）
 │   ├── vendor/fairy-mascot/ Fairy-DSH 形象模块原样副本
-│   └── scripts/             build-mascot / smoke / e2e / package
+│   └── scripts/             build-mascot / smoke / e2e / package / zip
+├── .github/workflows/       release.yml：打 tag 自动打包并发布
 └── tests/                   94 项扩展测试
 ```
 

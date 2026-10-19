@@ -10,7 +10,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -20,9 +20,12 @@ import { FAIRY_LOG_PREFIX, createFairyDiagnostics } from '../src/contracts/index
 import type { FairyLogRecord } from '../src/contracts/index.ts';
 import {
   FAIRY_VOICE_COMMAND,
+  TTS_FALLBACK_CODES,
+  buildSpeechScript,
   buildWavFile,
   createTtsClient,
   createVoiceBrief,
+  createWindowsSpeech,
   configuredApiKey,
   fairyVoicePaths,
   formatFairyVoiceStatus,
@@ -32,6 +35,7 @@ import {
   splitSpeechSentences,
   applyFairyVoice,
 } from '../src/features/voice/index.ts';
+import type { FairySpeechProcess } from '../src/features/voice/index.ts';
 
 function createTestDiagnostics(moduleName = 'fairy-pi-test') {
   const records: FairyLogRecord[] = [];
@@ -351,6 +355,146 @@ test('语音简报：上游错误与取消语义', async () => {
   await assert.rejects(pending, (error: { code?: string }) => error.code === 'client-aborted');
 });
 
+// ---------- Windows 离线语音回退 ----------
+
+function withTempDir(run: (directory: string) => void | Promise<void>) {
+  return async (): Promise<void> => {
+    const directory = mkdtempSync(join(tmpdir(), 'fairy-voice-'));
+    try {
+      await run(directory);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  };
+}
+
+interface FakeChild {
+  process: FairySpeechProcess;
+  killCount: number;
+  command: string;
+  args: string[];
+}
+
+function createFakeChild(options: { exitCode?: number; neverExits?: boolean } = {}): FakeChild {
+  const exitListeners: Array<(code: number | null) => void> = [];
+  const errorListeners: Array<(error: Error) => void> = [];
+  let fired = false;
+  const handle: FakeChild = {
+    killCount: 0,
+    command: '',
+    args: [],
+    process: {
+      on(event: 'exit' | 'error', listener: ((code: number | null) => void) | ((error: Error) => void)) {
+        if (event === 'exit') {
+          exitListeners.push(listener as (code: number | null) => void);
+          // 退出必须发生在监听器挂上之后（真实 spawn 就是这个时序），
+          // 否则监听器永远收不到事件，只会等到超时。
+          if (!options.neverExits && !fired) {
+            fired = true;
+            queueMicrotask(() => {
+              for (const registered of exitListeners) registered(options.exitCode ?? 0);
+            });
+          }
+        } else {
+          errorListeners.push(listener as (error: Error) => void);
+        }
+        return handle.process;
+      },
+      kill() {
+        handle.killCount += 1;
+      },
+    },
+  };
+  void errorListeners;
+  return handle;
+}
+
+test('buildSpeechScript 用单引号字符串并把文本转义', () => {
+  const script = buildSpeechScript("C:/a'b/say.txt", 3);
+  assert.match(script, /Add-Type -AssemblyName System\.Speech/);
+  assert.match(script, /\$s\.Rate = 3/);
+  assert.match(script, /'C:\/a''b\/say\.txt'/);
+  assert.equal(buildSpeechScript('x.txt', 99).includes('$s.Rate = 10'), true, '语速应夹到 10');
+  assert.equal(buildSpeechScript('x.txt', -99).includes('$s.Rate = -10'), true, '语速应夹到 -10');
+});
+
+test('Windows 语音回退：成功、非零退出、超时、非 Windows', withTempDir(async (directory) => {
+  const { diagnostics, records } = createTestDiagnostics();
+  const paths = fairyVoicePaths(directory);
+
+  const okChild = createFakeChild({ exitCode: 0 });
+  const ok = createWindowsSpeech({
+    dataDir: directory,
+    diagnostics,
+    platform: 'win32',
+    spawnImpl: (command, args) => {
+      okChild.command = command;
+      okChild.args = args;
+      return okChild.process;
+    },
+  });
+  assert.equal(ok.available(), true);
+  assert.deepEqual(await ok.speak('你好，主人。'), { spoken: true });
+  assert.equal(okChild.command, 'powershell.exe');
+  assert.equal(okChild.args[0], '-NoProfile');
+  assert.match(okChild.args[3] ?? '', /System\.Speech/);
+  // 朗读文本落临时文件后按 UTF-8 读取，读不出才是失败
+  assert.equal(existsSync(join(directory, 'fairy-voice', 'spoken')), true);
+  assert.equal(readdirSync(join(directory, 'fairy-voice', 'spoken')).length, 0, '临时文本文件应被清理');
+  assert.ok(records.some((record) => record.event === 'metric' && record.operation === 'speech.spoken'));
+  void paths;
+
+  const failed = createWindowsSpeech({
+    dataDir: directory,
+    diagnostics,
+    platform: 'win32',
+    spawnImpl: () => createFakeChild({ exitCode: 1 }).process,
+  });
+  assert.deepEqual(await failed.speak('文本'), { spoken: false, reason: 'exit-1' });
+
+  const timingOut = createWindowsSpeech({
+    dataDir: directory,
+    diagnostics,
+    platform: 'win32',
+    timeoutMs: 10,
+    spawnImpl: () => createFakeChild({ neverExits: true }).process,
+  });
+  const timeoutChild = createFakeChild({ neverExits: true });
+  const timingOutChild = createWindowsSpeech({
+    dataDir: directory,
+    diagnostics,
+    platform: 'win32',
+    timeoutMs: 10,
+    spawnImpl: () => timeoutChild.process,
+  });
+  assert.deepEqual(await timingOutChild.speak('文本'), { spoken: false, reason: 'timeout' });
+  assert.equal(timeoutChild.killCount, 1, '超时应 kill 子进程');
+  void timingOut;
+  void failed;
+
+  const unsupported = createWindowsSpeech({ dataDir: directory, diagnostics, platform: 'linux' });
+  assert.equal(unsupported.available(), false);
+  assert.deepEqual(await unsupported.speak('文本'), { spoken: false, reason: 'platform-unsupported' });
+  assert.deepEqual(await ok.speak('   '), { spoken: false, reason: 'empty-text' });
+}));
+
+test('Windows 语音回退：cancel 会立刻打断当前朗读', withTempDir(async (directory) => {
+  const { diagnostics } = createTestDiagnostics();
+  const child = createFakeChild({ neverExits: true });
+  const speech = createWindowsSpeech({
+    dataDir: directory,
+    diagnostics,
+    platform: 'win32',
+    timeoutMs: 30_000,
+    spawnImpl: () => child.process,
+  });
+
+  const pending = speech.speak('很长的文本');
+  speech.cancel();
+  assert.equal(child.killCount, 1);
+  assert.deepEqual(await pending, { spoken: false, reason: 'canceled' }, '不应等到超时才结案');
+}));
+
 // ---------- 端到端：applyFairyVoice ----------
 
 interface FakePi {
@@ -508,6 +652,86 @@ test('applyFairyVoice：新的 say 取消上一段，被取消方不报错', asy
     assert.equal(notifications[0]?.[1], 'info');
     assert.match(notifications[0]?.[0] ?? '', /2 字节/);
     assert.equal(existsSync(fairyVoicePaths(directory).outputDir), true);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('applyFairyVoice：本地 TTS 不可用时回退到 Windows 语音朗读', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'fairy-voice-'));
+  try {
+    const { diagnostics, records } = createTestDiagnostics();
+    const { api, dispatch } = createFakePi();
+    const { context, notifications } = createFakeContext();
+    const child = createFakeChild({ exitCode: 0 });
+
+    const runtime = applyFairyVoice(api, {
+      dataDir: directory,
+      diagnostics,
+      platform: 'win32',
+      speechSpawnImpl: (command, args) => {
+        child.command = command;
+        child.args = args;
+        return child.process;
+      },
+      fetchImpl: fetchReturning(() => {
+        throw new Error('connection refused');
+      }),
+    });
+
+    await dispatch('session_start', { reason: 'startup' }, context);
+    await runtime.handlers.say('主人，测试回退。', context);
+
+    assert.equal(notifications.length, 1);
+    assert.equal(notifications[0]?.[1], 'warning');
+    assert.match(notifications[0]?.[0] ?? '', /本地 TTS 不可用（local-service-unavailable）/);
+    assert.match(notifications[0]?.[0] ?? '', /已改用 Windows 内置语音朗读/);
+    assert.match(notifications[0]?.[0] ?? '', /不是 Fairy 的音色/);
+    assert.equal(child.command, 'powershell.exe');
+    assert.equal(child.args[0], '-NoProfile');
+    assert.match(child.args[3] ?? '', /System\.Speech/);
+    assert.ok(records.some((record) => record.operation === 'speech.spoken'));
+    assert.equal(records.some((record) => record.operation === 'speech.write'), false);
+
+    dispatch('session_shutdown', { reason: 'quit' }, context);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('applyFairyVoice：关闭回退时仍然如实报错', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'fairy-voice-'));
+  try {
+    const { diagnostics } = createTestDiagnostics();
+    const { api, dispatch } = createFakePi();
+    const { context, notifications } = createFakeContext();
+    let spawned = false;
+
+    const runtime = applyFairyVoice(api, {
+      dataDir: directory,
+      diagnostics,
+      platform: 'win32',
+      speechFallback: false,
+      speechSpawnImpl: () => {
+        spawned = true;
+        return createFakeChild().process;
+      },
+      fetchImpl: fetchReturning(() => {
+        throw new Error('connection refused');
+      }),
+    });
+
+    await dispatch('session_start', { reason: 'startup' }, context);
+    await runtime.handlers.say('测试。', context);
+
+    assert.equal(spawned, false, '关闭回退时不应起朗读进程');
+    assert.equal(notifications.at(-1)?.[1], 'error');
+    assert.equal(
+      notifications.at(-1)?.[0],
+      'Fairy 语音合成失败：local-service-unavailable',
+    );
+
+    dispatch('session_shutdown', { reason: 'quit' }, context);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

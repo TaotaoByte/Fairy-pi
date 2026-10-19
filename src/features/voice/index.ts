@@ -40,6 +40,12 @@ import {
   type VoiceBriefOptions,
 } from './voice-brief.ts';
 import { markdownToSpeechText, normalizeSpeechText, splitSpeechSentences } from './speech-text.ts';
+import {
+  DEFAULT_SPEECH_TIMEOUT_MS,
+  createWindowsSpeech,
+  type FairySpeechSpawn,
+  type WindowsSpeech,
+} from './windows-speech.ts';
 
 export {
   LOCAL_DOCS_URL,
@@ -67,6 +73,22 @@ export {
 } from './voice-brief.ts';
 export type { VoiceBrief, VoiceBriefOptions } from './voice-brief.ts';
 export { markdownToSpeechText, normalizeSpeechText, splitSpeechSentences } from './speech-text.ts';
+export {
+  DEFAULT_SPEECH_TIMEOUT_MS,
+  FAIRY_SPEECH_DIR,
+  buildSpeechScript,
+  createWindowsSpeech,
+} from './windows-speech.ts';
+export type {
+  FairySpeechProcess,
+  FairySpeechSpawn,
+  WindowsSpeech,
+  WindowsSpeechOptions,
+  WindowsSpeechResult,
+} from './windows-speech.ts';
+
+/** 触发离线语音回退的上游错误码：后端没起、超时、合成失败。 */
+export const TTS_FALLBACK_CODES = new Set(['local-service-unavailable', 'timeout', 'local-service-failed']);
 
 export const FAIRY_VOICE_COMMAND = 'fairy-voice';
 
@@ -149,6 +171,12 @@ export interface FairyVoiceOptions {
   /** `brief` 取密钥用的供应商 id，默认 `deepseek`。 */
   provider?: string;
   now?: () => Date;
+  /** 本地 TTS 失败时是否改用 Windows 内置语音，默认 win32 上开启（本包新增的回退）。 */
+  speechFallback?: boolean;
+  /** 回退用的进程端口，测试注入用。 */
+  speechSpawnImpl?: FairySpeechSpawn;
+  /** 平台覆盖，测试注入用。 */
+  platform?: NodeJS.Platform;
 }
 
 /** 命令子语义，便于单测直接调用而不必解析字符串。 */
@@ -167,7 +195,7 @@ function usageText(): string {
   return [
     'Fairy 语音用法：',
     '  /fairy-voice status           探测本地语音服务',
-    '  /fairy-voice say <文本>       合成并写出 WAV 文件',
+    '  /fairy-voice say <文本>       合成并写出 WAV 文件（本地 TTS 不可用时回退到 Windows 语音）',
     '  /fairy-voice brief <Markdown> 生成适合朗读的中文简报',
   ].join('\n');
 }
@@ -185,6 +213,15 @@ export function applyFairyVoice(pi: ExtensionAPI, options: FairyVoiceOptions): F
   let client: TtsClient | undefined;
   let voiceBrief: VoiceBrief | undefined;
   let activeSay: AbortController | undefined;
+
+  const platform = options.platform ?? process.platform;
+  const speech: WindowsSpeech = createWindowsSpeech({
+    dataDir: options.dataDir,
+    diagnostics,
+    ...(options.speechSpawnImpl ? { spawnImpl: options.speechSpawnImpl } : {}),
+    ...(options.platform ? { platform: options.platform } : {}),
+  });
+  const speechFallback = options.speechFallback ?? platform === 'win32';
 
   attachFairySession(pi, {
     diagnostics,
@@ -207,6 +244,7 @@ export function applyFairyVoice(pi: ExtensionAPI, options: FairyVoiceOptions): F
       scope.register('voice-client', () => {
         activeSay?.abort('disposed');
         activeSay = undefined;
+        speech.cancel();
         client = undefined;
         voiceBrief = undefined;
       });
@@ -233,6 +271,7 @@ export function applyFairyVoice(pi: ExtensionAPI, options: FairyVoiceOptions): F
 
       // 上游「最新意图取消上一段」：本地推理管线是单条可变状态。
       activeSay?.abort('superseded');
+      speech.cancel();
       const controller = new AbortController();
       activeSay = controller;
       const spoken = normalizeSpeechText(markdownToSpeechText(trimmed));
@@ -258,9 +297,26 @@ export function applyFairyVoice(pi: ExtensionAPI, options: FairyVoiceOptions): F
         });
       } catch (error) {
         const code = (error as { code?: string })?.code ?? 'unknown';
-        if (code !== 'superseded' && code !== 'client-aborted') {
-          ctx.ui.notify(`Fairy 语音合成失败：${code}`, 'error');
+        if (code === 'superseded' || code === 'client-aborted') return;
+
+        // 上游路径失败（最常见：9880 后端没起）→ 用本机离线语音朗读，别让 say 变成死路。
+        if (speechFallback && speech.available() && TTS_FALLBACK_CODES.has(code)) {
+          const fallback = await speech.speak(spoken);
+          if (fallback.spoken) {
+            ctx.ui.notify(
+              `Fairy 语音：本地 TTS 不可用（${code}），已改用 Windows 内置语音朗读。\n注意：这不是 Fairy 的音色。`,
+              'warning',
+            );
+            return;
+          }
+          if (fallback.reason === 'canceled') return;
+          ctx.ui.notify(
+            `Fairy 语音不可用：本地 TTS（${code}），Windows 语音回退也失败（${fallback.reason}）。`,
+            'error',
+          );
+          return;
         }
+        ctx.ui.notify(`Fairy 语音合成失败：${code}`, 'error');
       } finally {
         if (activeSay === controller) activeSay = undefined;
       }

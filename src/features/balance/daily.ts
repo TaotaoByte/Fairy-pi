@@ -11,9 +11,10 @@
  * 按错误签名去重上报（同一签名只在首次出现时记一条 error）。
  */
 
-import { chmodSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { replaceFileAtomically } from '../../atomic-file.ts';
 import { createFairyDiagnostics } from '../../contracts/index.ts';
 import type { FairyDiagnostics } from '../../contracts/index.ts';
 import {
@@ -65,7 +66,8 @@ export function createFileDailyStore(directory: string): FairyDailyStore {
       const temporary = `${file}.${process.pid}.tmp`;
       try {
         writeFileSync(temporary, JSON.stringify(record), { encoding: 'utf8', mode: 0o600 });
-        renameSync(temporary, file);
+        // Windows 上目标可能正被读取（`/fairy-balance`、外部脚本），rename 会瞬时失败。
+        replaceFileAtomically(temporary, file);
         chmodSync(file, 0o600);
       } catch (error) {
         try {

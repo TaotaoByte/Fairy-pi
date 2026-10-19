@@ -30,8 +30,11 @@ Copyright 2026 Fairy-pi contributors
    agent.cordis.yml 里的 DSH 插件编排部分仅作来源留档，不参与运行。
 
 5. browser-dock/               → src/features/browser/
-   proxy.cjs 的 MCP 代理参数、状态文件的读写与命令语义；HTTP 端点与
-   frame 代理未移植（改为 MCP 服务器注册与状态命令）。
+   状态文件的容错读取、控制命令的校验语义（动作白名单、takeover 三重前提与冲突码）、
+   控制令牌之外的原子写入与目录监听语义。
+   上游 `proxy.cjs` 里与 playwright 安装路径绑定的部分改写为**与具体 MCP 无关**的通用
+   代理 dock-producer.cjs：逐行原样转发、从任意工具结果的图片落帧、5 秒复查命令文件；
+   上游的 `/frame` JPEG 服务未移植（Pi 无 HTTP 端点，帧改为落盘文件并列出路径）。
 
 6. fairy-system/               → scripts/
    离线校验的检查项与判定口径；DSH_* 环境变量改为包内参数。

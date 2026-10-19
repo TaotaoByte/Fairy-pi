@@ -21,9 +21,10 @@
  * （监听文件 inode 会漏事件）。此处保持同样的选择与同样的 `state.json` 文件名过滤。
  */
 
-import { mkdirSync, readdirSync, readFileSync, renameSync, unlinkSync, watch, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, unlinkSync, watch, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { replaceFileAtomically } from '../../atomic-file.ts';
 import { createFairyDiagnostics } from '../../contracts/index.ts';
 import type { FairyDiagnostics } from '../../contracts/index.ts';
 
@@ -160,7 +161,8 @@ export function writeDockCommand(
   const temporary = `${paths.commandFile}.${process.pid}.tmp`;
   writeFileSync(temporary, payload, { encoding: 'utf8', mode: 0o600 });
   try {
-    renameSync(temporary, paths.commandFile);
+    // 生产者可能在读同一文件；Windows 上 rename 会瞬时失败，故走带重试的原子替换。
+    replaceFileAtomically(temporary, paths.commandFile);
   } catch (error) {
     try {
       unlinkSync(temporary);

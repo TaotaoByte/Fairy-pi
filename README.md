@@ -47,7 +47,30 @@ pi install /path/to/Fairy-pi
 - **本地 TTS**：`http://127.0.0.1:9880` 后端未部署时，`/fairy-voice status` 会**如实报「未启动」**——这是上游本地服务缺失时的既有行为，不是缺陷。参考音频放 `<数据目录>/fairy-voice/runtime/reference/fairy_ref.wav`（提示词同目录 `fairy_ref.txt`，缺失则退化为上游的固定文案）。
   `say` 不会因此变成死路：本地 TTS 失败时自动改用 **Windows 内置语音**（`System.Speech`）朗读，通知里写清「这不是 Fairy 的音色」。这是本包新增的回退（上游没有），只为让没有 9880 后端的机器也能出声；`speechFallback: false` 可关掉。文本走临时文件传入而不拼进 `-Command`，避免引号与注入。
 - **人格注入**：默认关闭。`/fairy-persona on` 后，通过 `before_agent_start` 的 `systemPromptOptions.sections` 注入**有上界**的人设 + 语料摘要，不整体替换 `systemPrompt`。
-- **浏览器坞**：`browser-dock` 的 `proxy.cjs`（生产者）不在本包内。需要浏览器状态时，让生产者按 `<数据目录>/browser-dock/` 的文件契约写 `state.json` 即可；MCP 服务器由使用方通过 `applyFairyBrowserDock(pi, { mcp })` 传入配置自行注册。
+- **浏览器坞**：本包**自带生产者** [`dock-producer.cjs`](src/features/browser/dock-producer.cjs)——一个与具体 MCP 无关的 stdio 代理：把请求/响应逐行原样转发，观察 `tools/call` 发布状态，**任何工具结果里的图片**都落成 `frame-<revision>.jpg`，并按 `<数据目录>/browser-dock/command.json` 处理 `bind`/`close`/`takeover`。接法二选一：
+
+  ```jsonc
+  // 方式一（推荐，走 Pi 自带的 MCP 支持；`pi mcp list` 可验证）
+  // ~/.pi/agent/mcp.json
+  {
+    "mcpServers": {
+      "browser-dock": {
+        "command": "node",
+        "args": [
+          "<本包路径>/src/features/browser/dock-producer.cjs",
+          "npx", "@playwright/mcp@latest"
+        ]
+      }
+    }
+  }
+  ```
+
+  ```powershell
+  # 方式二（由本扩展注册；需要 Pi 内置 MCP 支持来建立连接）
+  $env:FAIRY_PI_BROWSER_MCP_ARGS = '["npx","@playwright/mcp@latest"]'
+  ```
+
+  不接任何 MCP 时，`/fairy-browser state` 会如实显示「未激活」——文件契约本身是可用的，缺的只是生产者。第二个参数起就是目标 MCP 命令，换成任何 MCP 都行。
 
 ## 已验证口径
 
@@ -60,6 +83,12 @@ pi install /path/to/Fairy-pi
 部分「怪」结果是**上游原样行为**（`第二句!` 半角标点、`负 负二百七十三点一五` 重复、千分位逗号转全角），测试里专门断言它们，防止后来者顺手优化而破坏一致性。
 
 实机验证（pi 1.0.4）：`pi --mode json -p` 跑通，入口加载、四个功能的会话作用域建立、`message_end` 的用量累计真实写入 `<数据目录>/balance-meter-daily.json`；Windows 内置语音实测发声成功（本机装有三套 SAPI 语音）。
+
+浏览器坞生产者：4 项集成测试真的起两个进程（代理 + 假 MCP）用 JSON-RPC 驱动，覆盖透明转发、任意图片落帧、工具名/参数命中人机验证、`takeover`/`close` 与收场清理；另有 2 项入口测试覆盖 `FAIRY_PI_BROWSER_MCP_ARGS` 的解析与注册。
+
+**一处未在本机验证**：`pi --mode json -p` 这次运行里，扩展注册的 MCP 服务器没有留下连接痕迹（`~/.pi/agent/mcp.log` 不存在，生产者也没启动）。所以我没把「方式二」写成已验证——请用交互式 pi 的 `/mcp` 或 `pi mcp list` 确认；「方式一」的 `mcp.json` 是 Pi 自带 MCP 支持直接读取的路径，可先用 `pi mcp list` 验证条目本身。
+
+**跨平台修正**：Windows 上 `rename` 覆盖正被打开的目标会瞬时失败（`EPERM`/`EACCES`/`EBUSY`），而消费者经常在轮询同一个文件。三处落盘（日账、坞状态、坞命令）现在统一走带退避重试的原子替换——这个缺陷是测试轮询状态文件时暴露出来的，不修就会静默丢一次写入。
 
 **估算口径的注意点**：单价表来自上游，只覆盖 `deepseek-v4-flash`。若会话用的是别的模型（例如默认的 `deepseek-v4-pro`），`/fairy-balance` 的「费用估算」是按 flash 单价推算的值，会与 Pi 自己的记账不一致——`Pi 记账` 那一行就是为此显示的。
 

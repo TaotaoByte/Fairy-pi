@@ -117,7 +117,7 @@ npm run test:e2e   # 真开窗口、真发一句话、断言回复与用量
 
 **桌面端**：先用一个探针脚本确认 `pi --mode rpc` 的握手（`get_state` / `get_commands` / `get_session_stats` 均正常返回、关 stdin 后干净退出），然后对**打包出来的 `Fairy-pi.exe`** 跑了端到端：CDP 把它当用户操作——填输入框、派发提交、轮询界面——断言 13 项全部通过（含欢迎态与对话态两张截图落盘），其中窗口标题为 `Fairy-pi · pi 1.0.4`、模型 chip 显示 `DeepSeek V4 Pro`、用户消息与助手回复都在屏上、`agent_settled` 后运行态回「空闲」、用量累计到 `5,835 tok`。Fairy 形象确实挂载（`[data-dsh-fairy-mascot-root="true"]`），子进程确认为 `node.exe <pi cli.js> --mode rpc`。
 
-**命令名必须原样使用**：`get_commands` 里同名的两个命令，pi 会改名为 `fairy-voice:1` / `fairy-voice:2`（本机实测：`:1` 是旧的 pi-fairy 桌宠包，`:2` 是本包）。这两个后缀名才是可派发的命令——把后缀去掉得到的 `/fairy-voice` 不是命令，pi 会**把它当普通输入交给模型**（实测回包 `disposition: "started"`，模型开始翻目录找这个技能）。所以命令面板与欢迎态 chips 一律显示 `get_commands` 给出的原始名字，不做美化。
+**命令名必须原样使用**：`get_commands` 里同名的两个命令，pi 会改名为 `fairy-voice:1` / `fairy-voice:2`（本机实测：`:1` 是旧的 pi-fairy 桌宠包，`:2` 是本包；那之后已用 `pi remove "G:\AI_Project\pi-fairy"` 卸掉旧包，现在本机只剩无后缀的 `fairy-voice`）。这两个后缀名才是可派发的命令——把后缀去掉得到的 `/fairy-voice` 不是命令，pi 会**把它当普通输入交给模型**（实测回包 `disposition: "started"`，模型开始翻目录找这个技能）。所以命令面板与欢迎态 chips 一律显示 `get_commands` 给出的原始名字，不做美化。
 
 **桌面端的三个真实缺陷**（都是实机跑出来的，不是推演）：一是 `path.join('F:', 'Users')` 会得到盘符相对的 `F:Users`，导致装在非系统盘时定位不到 pi；二是 PATH 分支多剥了一层目录，把 `agent_data` 丢了；三是按「去后缀」去重命令名，产出了派发不了的假命令。三处都已修，前两处加了不依赖 Electron 的定位单测，第三处改为一律原样显示；另修掉一个纯视觉问题——空输入框上多余的滚动条。
 
@@ -149,7 +149,7 @@ Fairy-pi/
 │   ├── src/renderer/        界面（index.html / styles.css / app.js）
 │   ├── vendor/fairy-mascot/ Fairy-DSH 形象模块原样副本
 │   └── scripts/             build-mascot / smoke / e2e / package
-└── tests/                   88 项扩展测试
+└── tests/                   94 项扩展测试
 ```
 
 ## 开发
